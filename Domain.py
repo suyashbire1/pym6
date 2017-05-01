@@ -19,8 +19,6 @@ class Grid:
 
     def __repr__(self):
         print('Grid metrics found: {}'.format(vars(self).keys()))
-#        for key in vars(self):
-#            print(key)
         return "MOM6 grid object."
 
 class Domain(Grid):
@@ -38,13 +36,6 @@ class Domain(Grid):
         self.ts = ts
         self.te = te
         self.populateslices()
-
-    @staticmethod
-    def findlims(dim,start,end):
-        """Finds the extreme indices of the domain."""
-        usefulindx = np.nonzero((dim >= start) & (dim <= end))[0]
-        lims = usefulindx[0], usefulindx[-1]+1
-        return lims
 
     @staticmethod
     def extendslice(sl,dims,n):
@@ -71,6 +62,13 @@ class Domain(Grid):
         n = [[-1],[1],[-1],[1],[-1,1],[-1,1]]
         for i, slc in enumerate(slices):
             setattr(self,'sl'+slc,self.extendslice(sl,exdims[i],n[i]))
+
+    @staticmethod
+    def findlims(dim,start,end):
+        """Finds the extreme indices of the domain."""
+        usefulindx = np.nonzero((dim >= start) & (dim <= end))[0]
+        lims = usefulindx[0], usefulindx[-1]+1
+        return lims
 
     def populateslices(self):
         """Creates slices from the wlon,elon,slat,nlat,ls,le,ts,te inputs"""
