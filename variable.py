@@ -38,8 +38,8 @@ class GridVariable():
                 print(self._slc)
                 break
 
-    def readvar(self,slc):
-        out_array = self._v[getattr(self.dom,slc)]
+    def update_array(self,slc):
+        out_array = self._v[getattr(self,slc)]
         if np.ma.isMaskedArray(out_array):
             out_array = out_array.filled(np.nan)
         out_array = GridNdarray(out_array,self.loc)
@@ -93,11 +93,27 @@ class GridVariable():
             for op in operations:
                 setattr(self,dim+op,partial(self.slc_changer,dim+op))
 
+    def purge_array(self):
+        self.array = None
+        self._slc = self.sl
+
     def o1diff(self,axis):
         possible_locs = dict(u = ['u','u','q','h'],
                              v = ['v','v','h','q'],
                              h = ['h','h','v','u'],
                              q = ['q','q','u','v'])
         out_arr = np.diff(self.array,1,axis)
+        out_arr.loc = possible_locs[self.array.loc][axis]
+        self.purge_array()
+        return out_arr
+
+    def move_to_neighbor(self,axis):
+        possible_locs = dict(u = ['u','u','q','h'],
+                             v = ['v','v','h','q'],
+                             h = ['h','h','v','u'],
+                             q = ['q','q','u','v'])
+        out_arr = 0.5*self.array
+        self.slc = 
+        out_arr += np.roll(self.array, 1,axis=axis)
         out_arr.loc = possible_locs[self.array.loc][axis]
         return out_arr
