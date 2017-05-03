@@ -16,6 +16,9 @@ class Grid:
                 setattr(self,var,_fhgv.variables[var][:])
         self.R_earth = 6.378e6
         self.Rho0 = self.R[-1]
+        self.total_xlen = self.lonh.size
+        self.total_ylen = self.lath.size
+        self.total_zlen = self.Layer.size+1
 
     def __repr__(self):
         print('Grid metrics found: {}'.format(vars(self).keys()))

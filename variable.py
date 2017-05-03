@@ -107,13 +107,29 @@ class GridVariable():
         self.purge_array()
         return out_arr
 
-    def move_to_neighbor(self,axis):
+    def move_to_neighbor(self,loc):
+        if loc == self.array.loc: return
         possible_locs = dict(u = ['u','u','q','h'],
                              v = ['v','v','h','q'],
                              h = ['h','h','v','u'],
                              q = ['q','q','u','v'])
+        possible_shifts = dict(u = [0,0,1,-1],
+                               v = [0,0,-1,1],
+                               h = [0,0,1,1],
+                               q = [0,0,-1,-1])
         out_arr = 0.5*self.array
-        self.slc = 
+        sl = self.slc
+        i = possible_locs[self.array.loc].index(loc)
         out_arr += np.roll(self.array, 1,axis=axis)
         out_arr.loc = possible_locs[self.array.loc][axis]
         return out_arr
+
+    @staticmethod
+    def shift_slice(sl,dim,n):
+        """Extends the dimension, dim, of slice, sl, by n."""
+        dims = np.zeros((4,3))
+        dims[dim,:2] = n
+        for i, slc in enumerate(sl):
+            dims+=
+        sl = np.s_[ts:te,ls:le,ys:ye,xs:xe]
+        return sl
