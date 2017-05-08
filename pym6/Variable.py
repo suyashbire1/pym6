@@ -146,7 +146,7 @@ class GridVariable():
                              v = ['v','v','h','q'],
                              h = ['h','h','v','u'],
                              q = ['q','q','u','v'])
-        out_array = np.diff(self.values,1,axis)
+        out_array = np.diff(self.values,n=1,axis=axis)
         out_array.loc = possible_locs[self.values.loc][axis]
         return self
 
