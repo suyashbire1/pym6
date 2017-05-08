@@ -14,8 +14,11 @@ class Grid:
                 setattr(self,var,_fhg.variables[var][:])
             for var in _fhgv.variables:
                 setattr(self,var,_fhgv.variables[var][:])
-        self.R_earth = 6.378e6
+        self.g = 9.8
         self.Rho0 = self.R[-1]
+        b = self.g/self.Rho0*(self.Layer)
+        self.db = (b[0]-b[1])
+        self.R_earth = 6.378e6
         self.total_xlen = self.lonh.size
         self.total_ylen = self.lath.size
         self.total_zlen = self.Layer.size+1

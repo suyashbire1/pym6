@@ -30,6 +30,7 @@ class GridVariable():
                 self.plot_loc = kwargs.get('plot_loc',self.loc)
                 self._plot_slice = self.dom.slices[self.plot_loc]
                 self.implement_syntactic_sugar_for_plot_slice()
+                self.dom.dt = np.diff(fh.variables['Time'][:2])*3600
                 break
 
     @property
@@ -115,7 +116,8 @@ class GridVariable():
             out_array = self.extend_halos(out_array,axis=3,
                                           boundary_index=-1,**extend_kwargs)
         out_array = GridNdarray(out_array,self.loc)
-        return out_array
+        self.values = out_array
+        return self
 
     def _modify_slice(self,axis,ns,ne):
         out_slice = self._plot_slice[axis,0] + ns
@@ -139,17 +141,31 @@ class GridVariable():
                              q = ['q','q','u','v'])
         out_array = np.diff(array,1,axis)
         out_array.loc = possible_locs[array.loc][axis]
-        return out_arr
+        return out_array
 
-    @staticmethod
-    def move_to_neighbor(array,new_loc):
+    def ddx(self,axis):
+        possible_divisors = dict(u = [self.dom.dt, self.dom.db,
+                                      self.dom.dyBu, self.dom.dxT],
+                                 v = [self.dom.dt, self.dom.db,
+                                      self.dom.dyT,  self.dom.dxBu],
+                                 h = [self.dom.dt, self.dom.db,
+                                      self.dom.dyCv, self.dom.dxCu],
+                                 q = [self.dom.dt, self.dom.db,
+                                      self.dom.dyCu, self.dom.dxCv])
+        divisor = possible_divisors[self.values.loc][axis][self._slice[2:]]
+        ddx = self.o1diff(self.values,axis)/divisor
+        self.values = ddx
+        return self
+
+    def move_to_neighbor(self,new_loc):
         possible_locs = dict(u = ['ul','q','h'],
                              v = ['vl','h','q'],
                              h = ['hl','v','u'],
                              q = ['ql','u','v'])
-        loc = array.loc
+        loc = self.values.loc
         axis = possible_locs[loc].index(new_loc)+1
-        out_array = 0.5*(  np.take(array,range(array.shape[axis]-1),axis=axis)
-                         + np.take(array,range(1,array.shape[axis]),axis=axis)  )
+        out_array = 0.5*(  np.take(self.values,range(self.values.shape[axis]-1),axis=axis)
+                         + np.take(self.values,range(1,self.values.shape[axis]),axis=axis)  )
         out_array.loc = new_loc
-        return out_array
+        self.values = out_array
+        return self

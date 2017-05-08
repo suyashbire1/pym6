@@ -11,6 +11,5 @@ setup(name='pym6',
       install_requires=[
           'numpy',
           'netCDF4',
-          'maplotlib',
       ],
       zip_safe=False)
