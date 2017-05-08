@@ -148,6 +148,7 @@ class GridVariable():
                              q = ['q','q','u','v'])
         out_array = np.diff(self.values,n=1,axis=axis)
         out_array.loc = possible_locs[self.values.loc][axis]
+        self.values = out_array
         return self
 
     def ddx(self,axis):
