@@ -30,7 +30,11 @@ class GridVariable():
                 self.plot_loc = kwargs.get('plot_loc',self.loc)
                 self._plot_slice = self.dom.slices[self.plot_loc]
                 self.implement_syntactic_sugar_for_plot_slice()
-                self.dom.dt = np.diff(fh.variables['Time'][:2])*3600
+                self.Time = fh.variables['Time'][:]
+                self.dom.dt = np.diff(self.Time[:2])*3600
+                average_DT = fh.variables['average_DT'][:]
+                average_DT = average_DT[:,np.newaxis,np.newaxis,np.newaxis]
+                self.average_DT = average_DT
                 break
 
     @property
@@ -115,6 +119,10 @@ class GridVariable():
         if self._plot_slice[3,1] > self.dom.total_xlen:
             out_array = self.extend_halos(out_array,axis=3,
                                           boundary_index=-1,**extend_kwargs)
+        tmean = kwargs.get('tmean',True)
+        if tmean:
+            dt = self.average_DT
+            out_array = np.apply_over_axes(np.sum,out_array*dt,0)/np.sum(dt)
         out_array = GridNdarray(out_array,self.loc)
         self.values = out_array
         return self
