@@ -141,15 +141,14 @@ class GridVariable():
                        slice_array[3,0]:slice_array[3,1]:slice_array[3,2] ]
         return Slice
 
-    @staticmethod
-    def o1diff(array,axis):
+    def o1diff(self,axis):
         possible_locs = dict(u = ['u','u','q','h'],
                              v = ['v','v','h','q'],
                              h = ['h','h','v','u'],
                              q = ['q','q','u','v'])
-        out_array = np.diff(array,1,axis)
-        out_array.loc = possible_locs[array.loc][axis]
-        return out_array
+        out_array = np.diff(self.values,1,axis)
+        out_array.loc = possible_locs[self.values.loc][axis]
+        return self
 
     def ddx(self,axis):
         possible_divisors = dict(u = [self.dom.dt, self.dom.db,
@@ -161,7 +160,7 @@ class GridVariable():
                                  q = [self.dom.dt, self.dom.db,
                                       self.dom.dyCu, self.dom.dxCv])
         divisor = possible_divisors[self.values.loc][axis][self._slice[2:]]
-        ddx = self.o1diff(self.values,axis)/divisor
+        ddx = self.o1diff(axis)/divisor
         self.values = ddx
         return self
 
