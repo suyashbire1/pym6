@@ -17,6 +17,7 @@ class GridNdarray(np.ndarray):
         return np.ndarray.__array_wrap__(self, out_arr, context)
 
 class GridVariable():
+
     """A class to hold a variable."""
     def __init__(self,var,domain,loc,*fhl,**kwargs):
         for fh in fhl:
