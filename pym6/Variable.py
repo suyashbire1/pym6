@@ -26,6 +26,7 @@ class GridVariable():
             except KeyError:
                 print('Trying next file.')
             else:
+                self.var = var
                 self.dom = domain
                 self.loc = loc
                 self.plot_loc = kwargs.get('plot_loc',self.loc)
@@ -37,6 +38,26 @@ class GridVariable():
                 average_DT = average_DT[:,np.newaxis,np.newaxis,np.newaxis]
                 self.average_DT = average_DT
                 break
+
+    def __add__(self,other):
+        if self.values.loc == other.values.loc:
+            new_variable = GridVariable(self.var,self.dom,self.values.loc)
+            new_variable.values = self.values + other.values
+            return new_variable
+        else:
+            raise ValueError('The two variables are not co-located.')
+
+    def __sub__(self,other):
+        if self.values.loc == other.values.loc:
+            new_variable = GridVariable(self.var,self.dom,self.values.loc)
+            new_variable.values = self.values - other.values
+            return new_variable
+        else:
+            raise ValueError('The two variables are not co-located.')
+
+    def __neg__(self,other):
+        self.values *= -1
+        return self
 
     @property
     def plot_slice(self):
