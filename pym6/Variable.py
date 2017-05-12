@@ -143,12 +143,16 @@ class GridVariable():
         return Slice
 
     def o1diff(self,axis):
-        possible_locs = dict(u = ['u','u','q','h'],
-                             v = ['v','v','h','q'],
-                             h = ['h','h','v','u'],
-                             q = ['q','q','u','v'])
+        possible_hlocs = dict(u = ['u','u','q','h'],
+                              v = ['v','v','h','q'],
+                              h = ['h','h','v','u'],
+                              q = ['q','q','u','v'])
+        possible_vlocs = dict(l = ['l','i','l','l'],
+                              i = ['i','l','i','i'])
+
         out_array = np.diff(self.values,n=1,axis=axis)
-        out_array.loc = possible_locs[self.values.loc][axis]
+        out_array.loc =  possible_hlocs[self.values.loc[0]][axis]
+                       + possible_vlocs[self.values.loc[1]][axis]
         self.values = out_array
         return self
 
@@ -161,18 +165,24 @@ class GridVariable():
                                       self.dom.dyCv, self.dom.dxCu],
                                  q = [self.dom.dt, self.dom.db,
                                       self.dom.dyCu, self.dom.dxCv])
-        divisor = possible_divisors[self.values.loc][axis][self._slice[2:]]
+        if axis == 1:
+            divisor = possible_divisors[self.values.loc][axis]
+        else:
+            divisor = possible_divisors[self.values.loc][axis][self._slice[2:]]
         ddx = self.o1diff(axis)/divisor
         self.values = ddx
         return self
 
-    def move_to_neighbor(self,new_loc):
-        possible_locs = dict(u = ['ul','q','h'],
-                             v = ['vl','h','q'],
-                             h = ['hl','v','u'],
-                             q = ['ql','u','v'])
+    def move_to(self,new_loc):
+        possible_hlocs = dict(u = ['q','h'],
+                              v = ['h','q'],
+                              h = ['v','u'],
+                              q = ['u','v'])
         loc = self.values.loc
-        axis = possible_locs[loc].index(new_loc)+1
+        if new_loc[0] in possible_hlocs[loc[0]]:
+            axis = possible_hlocs[loc[0]].index(new_loc[0])+2
+        elif new_loc[1] is not loc[1]:
+            axis = 1
         out_array = 0.5*(  np.take(self.values,range(self.values.shape[axis]-1),axis=axis)
                          + np.take(self.values,range(1,self.values.shape[axis]),axis=axis)  )
         out_array.loc = new_loc
