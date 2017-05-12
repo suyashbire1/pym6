@@ -187,9 +187,9 @@ class GridVariable():
                                  q = [self.dom.dt, self.dom.db,
                                       self.dom.dyCu, self.dom.dxCv])
         if axis == 1:
-            divisor = possible_divisors[self.values.loc][axis]
+            divisor = possible_divisors[self.values.loc[0]][axis]
         else:
-            divisor = possible_divisors[self.values.loc][axis][self._slice[2:]]
+            divisor = possible_divisors[self.values.loc[0]][axis][self._slice[2:]]
         ddx = self.o1diff(axis)/divisor
         self.values = ddx
         return self
