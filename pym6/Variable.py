@@ -55,7 +55,7 @@ class GridVariable():
         else:
             raise ValueError('The two variables are not co-located.')
 
-    def __neg__(self,other):
+    def __neg__(self):
         self.values *= -1
         return self
 
