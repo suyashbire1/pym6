@@ -190,7 +190,7 @@ class GridVariable():
             divisor = possible_divisors[self.values.loc[0]][axis]
         else:
             divisor = possible_divisors[self.values.loc[0]][axis][self._slice[2:]]
-        ddx = self.o1diff(axis)/divisor
+        ddx = self.o1diff(axis).values/divisor
         self.values = ddx
         return self
 
