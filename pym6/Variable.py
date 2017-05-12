@@ -177,9 +177,6 @@ class GridVariable():
         self.values = out_array
         return self
 
-    #random_comment
-    #random_comment2
-    #random_comment3
 
     def ddx(self,axis):
         possible_divisors = dict(u = [self.dom.dt, self.dom.db,
