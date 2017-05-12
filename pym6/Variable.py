@@ -29,7 +29,7 @@ class GridVariable():
                 self.var = var
                 self.dom = domain
                 self.loc = loc
-                self.plot_loc = kwargs.get('plot_loc',self.loc)
+                self.plot_loc = kwargs.get('plot_loc',self.loc)[0]
                 self._plot_slice = self.dom.slices[self.plot_loc]
                 self.implement_syntactic_sugar_for_plot_slice()
                 self.Time = fh.variables['Time'][:]
