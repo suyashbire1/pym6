@@ -172,8 +172,8 @@ class GridVariable():
                               i = ['i','l','i','i'])
 
         out_array = np.diff(self.values,n=1,axis=axis)
-        out_array.loc =  possible_hlocs[self.values.loc[0]][axis]
-                       + possible_vlocs[self.values.loc[1]][axis]
+        out_array.loc = (  possible_hlocs[self.values.loc[0]][axis]
+                           + possible_vlocs[self.values.loc[1]][axis] )
         self.values = out_array
         return self
 
