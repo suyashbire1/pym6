@@ -122,7 +122,7 @@ class GridVariable():
             array = np.append(array1,array2,axis=axis)
         return array
 
-    def read_array(self,extend_kwargs=None,**kwargs):
+    def read_array(self,extend_kwargs={},**kwargs):
         self._slice = self._slice_array_to_slice(self._plot_slice)
         out_array = self._v[self._slice]
         if np.ma.isMaskedArray(out_array):
