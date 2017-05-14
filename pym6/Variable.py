@@ -55,6 +55,22 @@ class GridVariable():
         else:
             raise ValueError('The two variables are not co-located.')
 
+    def __mul__(self,other):
+        if self.values.loc == other.values.loc:
+            new_variable = GridVariable(self.var,self.dom,self.values.loc)
+            new_variable.values = self.values * other.values
+            return new_variable
+        else:
+            raise ValueError('The two variables are not co-located.')
+
+    def __div__(self,other):
+        if self.values.loc == other.values.loc:
+            new_variable = GridVariable(self.var,self.dom,self.values.loc)
+            new_variable.values = self.values / other.values
+            return new_variable
+        else:
+            raise ValueError('The two variables are not co-located.')
+
     def __neg__(self):
         self.values *= -1
         return self
@@ -95,31 +111,18 @@ class GridVariable():
             slip = kwargs.get('slip',False)
             slip_multiplyer = 1 if slip else -1
             array_extendor = slip_multiplyer*array.take([boundary_index],axis=axis)
-            if boundary_index == 0:
-                array1 = array_extendor
-                array2 = array
-            else:
-                array1 = array
-                array2 = array_extendor
-            array = np.append(array1,array2,axis=axis)
-        if method == 'mirror':
+        elif method == 'mirror':
             array_extendor = array.take([boundary_index],axis=axis)
-            if boundary_index == 0:
-                array1 = array_extendor
-                array2 = array
-            else:
-                array1 = array
-                array2 = array_extendor
-            array = np.append(array1,array2,axis=axis)
-        if method == 'zeros':
+        elif method == 'zeros':
             array_extendor = np.zeros(array.take([boundary_index],axis=axis).shape)
-            if boundary_index == 0:
-                array1 = array_extendor
-                array2 = array
-            else:
-                array1 = array
-                array2 = array_extendor
-            array = np.append(array1,array2,axis=axis)
+
+        if boundary_index == 0:
+            array1 = array_extendor
+            array2 = array
+        else:
+            array1 = array
+            array2 = array_extendor
+        array = np.append(array1,array2,axis=axis)
         return array
 
     def read_array(self,extend_kwargs={},**kwargs):
@@ -128,6 +131,13 @@ class GridVariable():
         if np.ma.isMaskedArray(out_array):
             filled = kwargs.get('filled',np.nan)
             out_array = out_array.filled(filled)
+
+#        for axis in range(2,4):
+#            for boundary_index in range(2):
+#                if self._plot_slice[axis,boundary_index] < 0:
+#                    out_array = self.extend_halos(out_array,axis=axis,
+#                                                  boundary_index=boundary_index,
+#                                                  **extend_kwargs)
 
         if self._plot_slice[2,0] < 0:
             out_array = self.extend_halos(out_array,axis=2,
