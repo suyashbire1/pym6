@@ -30,7 +30,7 @@ class GridVariable():
                 self.dom = domain
                 self.loc = loc
                 self.plot_loc = kwargs.get('plot_loc',self.loc)[0]
-                self._plot_slice = self.dom.slices[self.plot_loc]
+                self._plot_slice = self.dom.slices[self.plot_loc].copy()
                 self.implement_syntactic_sugar_for_plot_slice()
                 self.Time = fh.variables['Time'][:]
                 self.dom.dt = np.diff(self.Time[:2])*3600
