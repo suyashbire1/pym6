@@ -78,4 +78,3 @@ class Domain(Grid):
                                     [ys,ye,stride_y],
                                     [xs,xe,stride_x]])
             self.slices[gridloc[i]] = slice_array
-

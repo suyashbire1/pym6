@@ -24,7 +24,7 @@ class GridVariable():
             try:
                 self._v = fh.variables[var]
             except KeyError:
-                print('Trying next file.')
+                print('Variable not found. Trying next file.')
             else:
                 self.var = var
                 self.dom = domain
@@ -38,6 +38,17 @@ class GridVariable():
                 average_DT = average_DT[:,np.newaxis,np.newaxis,np.newaxis]
                 self.average_DT = average_DT
                 break
+
+        self._divisor = kwargs.get('divisor',None)
+        if self._divisor:
+            for fh in fhl:
+                try:
+                    self._div = fh.variables[self._divisor]
+                except KeyError:
+                    print('Divisor not found. Trying next file.')
+                else:
+                    self._htol = kwargs.get('htol',1e-3)
+                    break
 
     def __add__(self,other):
         if self.values.loc == other.values.loc:
@@ -132,12 +143,21 @@ class GridVariable():
             filled = kwargs.get('filled',np.nan)
             out_array = out_array.filled(filled)
 
-#        for axis in range(2,4):
-#            for boundary_index in range(2):
-#                if self._plot_slice[axis,boundary_index] < 0:
-#                    out_array = self.extend_halos(out_array,axis=axis,
-#                                                  boundary_index=boundary_index,
-#                                                  **extend_kwargs)
+        if self._divisor:
+            divisor = self._div[self._slice]
+            if np.ma.isMaskedArray(divisor):
+                filled = kwargs.get('filled',np.nan)
+                divisor = divisor.filled(filled)
+            divisor[divisor<self._htol] = np.nan
+            out_array /= divisor
+
+        divide_by_dx = kwargs.get('divide_by_dx',False)
+        if divide_by_dx:
+            out_array /= self.dom.dxCv[self._slice[2:]]
+
+        divide_by_dy = kwargs.get('divide_by_dy',False)
+        if divide_by_dx:
+            out_array /= self.dom.dyCu[self._slice[2:]]
 
         if self._plot_slice[2,0] < 0:
             out_array = self.extend_halos(out_array,axis=2,
@@ -159,9 +179,10 @@ class GridVariable():
         self.values = out_array
         return self
 
-    def _modify_slice(self,axis,ns,ne):
-        out_slice = self._plot_slice[axis,0] + ns
-        out_slice = out_slice[axis,1] + ne
+    def _modify_slice(self,axis,ns=0,ne=0):
+        out_slice = self._plot_slice.copy()
+        out_slice[axis,0] += ns
+        out_slice[axis,1] += ne
         return out_slice
 
     @staticmethod
@@ -197,10 +218,22 @@ class GridVariable():
                                       self.dom.dyCv, self.dom.dxCu],
                                  q = [self.dom.dt, self.dom.db,
                                       self.dom.dyCu, self.dom.dxCv])
+        possible_ns = dict(u = [0,0,0,1],
+                           v = [0,0,1,0],
+                           h = [0,0,0,0],
+                           q = [0,0,-1,-1])
+        possible_ne = dict(u = [0,0,-1,0],
+                           v = [0,0,0,-1],
+                           h = [0,0,-1,-1],
+                           q = [0,0,0,0])
         if axis == 1:
             divisor = possible_divisors[self.values.loc[0]][axis]
         else:
-            divisor = possible_divisors[self.values.loc[0]][axis][self._slice[2:]]
+            ns = possible_ns[self.values.loc[0]][axis]
+            ne = possible_ne[self.values.loc[0]][axis]
+            slice_array = self._modify_slice(axis,ns,ne)
+            _slice = self._slice_array_to_slice(slice_array)
+            divisor = possible_divisors[self.values.loc[0]][axis][_slice[2:]]
         ddx = self.o1diff(axis).values/divisor
         self.values = ddx
         return self
