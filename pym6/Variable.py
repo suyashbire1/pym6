@@ -143,11 +143,19 @@ class GridVariable():
             filled = kwargs.get('filled',np.nan)
             out_array = out_array.filled(filled)
 
+        tmean = kwargs.get('tmean',True)
+        if tmean:
+            dt = self.average_DT
+            out_array = np.apply_over_axes(np.sum,out_array*dt,0)/np.sum(dt)
+
         if self._divisor:
             divisor = self._div[self._slice]
             if np.ma.isMaskedArray(divisor):
                 filled = kwargs.get('filled',np.nan)
                 divisor = divisor.filled(filled)
+            if tmean:
+                dt = self.average_DT
+                divisor = np.apply_over_axes(np.sum,divisor*dt,0)/np.sum(dt)
             divisor[divisor<self._htol] = np.nan
             out_array /= divisor
 
@@ -158,6 +166,10 @@ class GridVariable():
         divide_by_dy = kwargs.get('divide_by_dy',False)
         if divide_by_dx:
             out_array /= self.dom.dyCu[self._slice[2:]]
+
+        divide_by_db = kwargs.get('divide_by_db',False)
+        if divide_by_db:
+            out_array /= self.dom.db
 
         if self._plot_slice[2,0] < 0:
             out_array = self.extend_halos(out_array,axis=2,
@@ -171,10 +183,6 @@ class GridVariable():
         if self._plot_slice[3,1] > self.dom.total_xlen:
             out_array = self.extend_halos(out_array,axis=3,
                                           boundary_index=-1,**extend_kwargs)
-        tmean = kwargs.get('tmean',True)
-        if tmean:
-            dt = self.average_DT
-            out_array = np.apply_over_axes(np.sum,out_array*dt,0)/np.sum(dt)
         out_array = GridNdarray(out_array,self.loc)
         self.values = out_array
         return self
