@@ -1,6 +1,8 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from netCDF4 import Dataset as dset, MFDataset as mfdset
 from functools import partial
+import copy
 
 class GridNdarray(np.ndarray):
     """A class to hold a grid-located variable."""
@@ -20,17 +22,17 @@ class GridVariable():
 
     """A class to hold a variable."""
     def __init__(self,var,domain,loc,*fhl,**kwargs):
+        self.var = var
+        self.dom = domain
+        self.loc = loc
+        self.plot_loc = kwargs.get('plot_loc',self.loc)[0]
+        self._plot_slice = self.dom.slices[self.plot_loc].copy()
         for fh in fhl:
             try:
                 self._v = fh.variables[var]
             except KeyError:
                 pass
             else:
-                self.var = var
-                self.dom = domain
-                self.loc = loc
-                self.plot_loc = kwargs.get('plot_loc',self.loc)[0]
-                self._plot_slice = self.dom.slices[self.plot_loc].copy()
                 self.implement_syntactic_sugar_for_plot_slice()
                 self.Time = fh.variables['Time'][:]
                 self.dom.dt = np.diff(self.Time[:2])*3600
@@ -38,6 +40,8 @@ class GridVariable():
                 average_DT = average_DT[:,np.newaxis,np.newaxis,np.newaxis]
                 self.average_DT = average_DT
                 self._htol = kwargs.get('htol',1e-3)
+                self._units = kwargs.get('units',None)
+                self.dom.Interface = fh.variables['zi'][:]
                 break
 
         self._divisor = kwargs.get('divisor',None)
@@ -51,65 +55,74 @@ class GridVariable():
                     break
 
     def __add__(self,other):
-        try:
-            if self.values.loc == other.values.loc:
-                new_variable = GridVariable(self.var,self.dom,self.values.loc)
-                new_variable.values = self.values + other.values
-                return new_variable
-            else:
-                raise ValueError('The two variables are not co-located.')
-        except AttributeError:
-            pass
-
-        self.values += other
-        return self
-
+        if hasattr(other,'values') and self.values.loc == other.values.loc:
+            new_variable = copy.copy(self)
+            new_variable.values = self.values + other.values
+            return new_variable
+        elif hasattr(other,'loc') and self.values.loc == other.loc: 
+            new_variable = copy.copy(self)
+            new_variable.values = self.values + other
+            return new_variable
+        else:
+            new_variable = copy.copy(self)
+            new_variable.values = self.values + other
+            return new_variable
 
     def __sub__(self,other):
-        try:
-            if self.values.loc == other.values.loc:
-                new_variable = GridVariable(self.var,self.dom,self.values.loc)
-                new_variable.values = self.values - other.values
-                return new_variable
-            else:
-                raise ValueError('The two variables are not co-located.')
-        except AttributeError:
-            pass
-
-        self.values -= other
-        return self
+        if hasattr(other,'values') and self.values.loc == other.values.loc:
+            new_variable = copy.copy(self)
+            new_variable.values = self.values - other.values
+            return new_variable
+        elif hasattr(other,'loc') and self.values.loc == other.loc: 
+            new_variable = copy.copy(self)
+            new_variable.values = self.values - other
+            return new_variable
+        else:
+            new_variable = copy.copy(self)
+            new_variable.values = self.values - other
+            return new_variable
 
     def __mul__(self,other):
-        try:
-            if self.values.loc == other.values.loc:
-                new_variable = GridVariable(self.var,self.dom,self.values.loc)
-                new_variable.values = self.values * other.values
-                return new_variable
-            else:
-                raise ValueError('The two variables are not co-located.')
-        except AttributeError:
-            pass
-
-        self.values *= other
-        return self
+        if hasattr(other,'values') and self.values.loc == other.values.loc:
+            new_variable = copy.copy(self)
+            new_variable.values = self.values * other.values
+            return new_variable
+        elif hasattr(other,'loc') and self.values.loc == other.loc: 
+            new_variable = copy.copy(self)
+            new_variable.values = self.values * other
+            return new_variable
+        else:
+            new_variable = copy.copy(self)
+            new_variable.values = self.values * other
+            return new_variable
 
     def __div__(self,other):
-        try:
-            if self.values.loc == other.values.loc:
-                new_variable = GridVariable(self.var,self.dom,self.values.loc)
-                new_variable.values = self.values / other.values
-                return new_variable
-            else:
-                raise ValueError('The two variables are not co-located.')
-        except AttributeError:
-            pass
-        
-        self.values /= other
-        return self
+        if hasattr(other,'values') and self.values.loc == other.values.loc:
+            new_variable = copy.copy(self)
+            new_variable.values = self.values / other.values
+            return new_variable
+        elif hasattr(other,'loc') and self.values.loc == other.loc: 
+            new_variable = copy.copy(self)
+            new_variable.values = self.values / other
+            return new_variable
+        else:
+            new_variable = copy.copy(self)
+            new_variable.values = self.values / other
+            return new_variable
 
     def __neg__(self):
-        self.values *= -1
-        return self
+        new_variable = copy.copy(self)
+        new_variable.values = self.values*-1
+        return new_variable
+
+    @property
+    def units(self):
+        return self._units
+
+    @units.setter
+    def units(self,units):
+        assert isinstance(units,str)
+        self._units = units
 
     @property
     def plot_slice(self):
@@ -177,6 +190,7 @@ class GridVariable():
         if tmean:
             dt = self.average_DT
             out_array = np.apply_over_axes(np.sum,out_array*dt,0)/np.sum(dt)
+            self._plot_slice[0,1] = 1
 
         if self._divisor:
             divisor = self._div[self._slice]
@@ -269,6 +283,7 @@ class GridVariable():
             ns = possible_ns[self.values.loc[0]][axis]
             ne = possible_ne[self.values.loc[0]][axis]
             slice_array = self._modify_slice(axis,ns,ne)
+            self._plot_slice = slice_array
             _slice = self._slice_array_to_slice(slice_array)
             divisor = possible_divisors[self.values.loc[0]][axis][_slice[2:]]
         ddx = self.o1diff(axis).values/divisor
@@ -280,13 +295,71 @@ class GridVariable():
                               v = ['h','q'],
                               h = ['v','u'],
                               q = ['u','v'])
+        possible_ns = dict(u = [0,0,0,1],
+                           v = [0,0,1,0],
+                           h = [0,0,0,0],
+                           q = [0,0,-1,-1])
+        possible_ne = dict(u = [0,-1,-1,0],
+                           v = [0,-1,0,-1],
+                           h = [0,-1,-1,-1],
+                           q = [0,-1,0,0])
         loc = self.values.loc
         if new_loc[0] in possible_hlocs[loc[0]]:
             axis = possible_hlocs[loc[0]].index(new_loc[0])+2
         elif new_loc[1] is not loc[1]:
             axis = 1
+        ns = possible_ns[loc[0]][axis]
+        ne = possible_ne[loc[0]][axis]
+        slice_array = self._modify_slice(axis,ns,ne)
+        self._plot_slice = slice_array
         out_array = 0.5*(  np.take(self.values,range(self.values.shape[axis]-1),axis=axis)
                          + np.take(self.values,range(1,self.values.shape[axis]),axis=axis)  )
         out_array.loc = new_loc
         self.values = out_array
         return self
+
+    def plot(self,reduce_func,mean_axes,plot_kwargs,**kwargs):
+        values = getattr(np,reduce_func)(values,axis = mean_axes)
+        gridloc = ['u','v','h','q']  # Four vertices of an Arakawa C-grid cell
+        xloc = ['q','h','h','q']     # X Location on the grid for variable in gridloc
+        yloc = ['h','q','h','q']     # Y Location on the grid for variable in gridloc
+
+        xloc_yloc_index = gridloc.index(self.plot_loc[0])
+        X = getattr(self.dom,'lon'+xloc[xloc_yloc_index])
+        Y = getattr(self.dom,'lat'+xloc[xloc_yloc_index])
+
+        gridloc = ['l','i']
+        zloc = ['Layer','Interface']
+        zloc_index = gridloc.index(self.plot_loc[1])
+        Z = getattr(self.dom,zloc[zloc_index])
+        T = self.Time
+        axes = [T,Z,Y,X]
+
+        keep_axes = ()
+        for i in range(4):
+            if i not in mean_axes:
+                keep_axes += (i,)
+
+        ax = kwargs.get('ax',None)
+        if ax is None:
+            fig,ax = plt.subplots(1,1)
+        
+        if len(keep_axes) == 1:
+            i = keep_axes[0]
+            x = axes[i][self._plot_slice[i,0]:self._plot_slice[i,1]]
+            ax.plot(x,values,**plot_kwargs)
+            return fig
+        elif len(keep_axes) == 2:
+            i = keep_axes[0]
+            y = axes[i][self._plot_slice[i,0]:self._plot_slice[i,1]]
+            i = keep_axes[1]
+            x = axes[i][self._plot_slice[i,0]:self._plot_slice[i,1]]
+
+            dx = np.diff(x)[0]
+            dy = np.diff(y)[0]
+            extent = [y.min()-dx/2,y.max()+dx/2,y.min()-dy/2,y.max()+dy/2]
+            im = ax.imshow(values,origin='lower',extent=extent,
+                           interpolation='none',
+                           **plot_kwargs)
+            ax.set_xlim(x.min(),x.max())
+            ax.set_ylim(y.min(),y.max())
