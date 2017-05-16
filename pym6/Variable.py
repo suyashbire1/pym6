@@ -348,7 +348,6 @@ class GridVariable():
             i = keep_axes[0]
             x = axes[i][self._plot_slice[i,0]:self._plot_slice[i,1]]
             im = ax.plot(x,values,**plot_kwargs)
-            return ax
         elif len(keep_axes) == 2:
             i = keep_axes[0]
             y = axes[i][self._plot_slice[i,0]:self._plot_slice[i,1]]
@@ -359,8 +358,13 @@ class GridVariable():
             dy = np.diff(y)[0]
             extent = [x.min()-dx/2,x.max()+dx/2,y.min()-dy/2,y.max()+dy/2]
             im = ax.imshow(values,origin='lower',extent=extent,
-                           interpolation='none',
+                           interpolation='none', aspect='auto',
                            **plot_kwargs)
+            cbar = kwargs.get('cbar',False)
+            if cbar:
+                cbar = plt.colorbar(im,ax=ax)
+                cbar.formatter.set_powerlimits((-3, 4))
+                cbar.update_ticks()
             ax.set_xlim(x.min(),x.max())
             ax.set_ylim(y.min(),y.max())
-            return ax
+        return im
