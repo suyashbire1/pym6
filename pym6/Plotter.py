@@ -1,8 +1,34 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pyximport
+pyximport.install()
+from .getvaratz import getvaratz as _vatz, getTatz as _Tatz, getTatzlin as _Tatzlin 
+
+def rhotoz(var,z,e,**kwargs):
+    input_dtype = var.dtype
+    z = np.array(z,dtype=np.float32)
+    if z.ndim == 0:
+        z = z[np.newaxis]
+    assert var.ndim == 4 or var.ndim == 1
+    if var.ndim == 4:
+        assert var.shape[1] == e.shape[1]-1
+        assert var.loc[0] == e.loc[0]
+        var = var.astype(np.float32)
+        e = e.astype(np.float32)
+        output_var = _vatz(var,z,e)
+        output_var = output_var.astype(np.float32)
+    elif var.ndim == 1:
+        kwargs.get('lin_interp',False)
+        var = var.astype(np.float32)
+        e = e.astype(np.float32)
+        if lin_interp:
+            output_var = _Tatzlin(var,z,e)
+        else:
+            output_var = _Tatz(var,z,e)
+    return output_var.astype(input_dtype)
 
 def plotter(self,reduce_func,mean_axes,plot_kwargs={},**kwargs):
-    values = getattr(np,reduce_func)(self.values,axis = mean_axes)
+
     gridloc = ['u','v','h','q']  # Four vertices of an Arakawa C-grid cell
     xloc = ['q','h','h','q']     # X Location on the grid for variable in gridloc
     yloc = ['h','q','h','q']     # Y Location on the grid for variable in gridloc
@@ -19,11 +45,40 @@ def plotter(self,reduce_func,mean_axes,plot_kwargs={},**kwargs):
     axes_label = ['Time',r'$\rho$','Lat','Lon']
     axes_units = ['s',r'$kgm^{-3}$',r'$^{\circ}$',r'$^{\circ}$']
     axes = [T,Z,Y,X]
+    for i,axis in enumerate(axes):
+        axes[i] = axis[self._plot_slice[i,0]:self._plot_slice[i,1]]
 
     keep_axes = ()
     for i in range(4):
         if i not in mean_axes:
             keep_axes += (i,)
+
+    values = self.values
+    if 1 in keep_axes:
+        zcoord = kwargs.get('zcoord',False)
+        if zcoord:
+            z = kwargs.get('z')
+            e = kwargs.get('e')
+            axes_label[1] = 'z'
+            axes_units[1] = 'm'
+            axes[1] = z
+            isop_mean = kwargs.get('isop_mean',True)
+            e = e.values
+            if isop_mean:
+                values = getattr(np,reduce_func)(values,
+                        axis=mean_axes,keepdims=True)
+                e = getattr(np,reduce_func)(e,
+                        axis=mean_axes,keepdims=True)
+            values = rhotoz(values,z,e)
+    elif 2 in keep_axes and 3 in keep_axes:
+        hslice = kwargs.get('hslice',False)
+        if hslice:
+            z = kwargs.get('z')
+            e = kwargs.get('e')
+            e = e.values
+            values = rhotoz(values,z,e)
+
+    values = getattr(np,reduce_func)(values,axis = mean_axes)
 
     ax = kwargs.get('ax',None)
     if ax is None:
@@ -31,7 +86,7 @@ def plotter(self,reduce_func,mean_axes,plot_kwargs={},**kwargs):
 
     if len(keep_axes) == 1:
         i = keep_axes[0]
-        x = axes[i][self._plot_slice[i,0]:self._plot_slice[i,1]]
+        x = axes[i]
         im = ax.plot(x,values,**plot_kwargs)
         ax.set_xlabel(axes_label[i] + ' (' + axes_units[i] + ')')
         if self.name and self.units:
@@ -40,10 +95,10 @@ def plotter(self,reduce_func,mean_axes,plot_kwargs={},**kwargs):
     elif len(keep_axes) == 2:
         i = keep_axes[0]
         ylabel = axes_label[i] + ' (' + axes_units[i] + ')'
-        y = axes[i][self._plot_slice[i,0]:self._plot_slice[i,1]]
+        y = axes[i]
         i = keep_axes[1]
         xlabel = axes_label[i] + ' (' + axes_units[i] + ')'
-        x = axes[i][self._plot_slice[i,0]:self._plot_slice[i,1]]
+        x = axes[i]
 
         perc = kwargs.get('perc',None)
         if perc:
