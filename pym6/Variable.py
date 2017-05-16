@@ -318,19 +318,19 @@ class GridVariable():
         self.values = out_array
         return self
 
-    def plot(self,reduce_func,mean_axes,plot_kwargs,**kwargs):
-        values = getattr(np,reduce_func)(values,axis = mean_axes)
+    def plot(self,reduce_func,mean_axes,plot_kwargs={},**kwargs):
+        values = getattr(np,reduce_func)(self.values,axis = mean_axes)
         gridloc = ['u','v','h','q']  # Four vertices of an Arakawa C-grid cell
         xloc = ['q','h','h','q']     # X Location on the grid for variable in gridloc
         yloc = ['h','q','h','q']     # Y Location on the grid for variable in gridloc
 
-        xloc_yloc_index = gridloc.index(self.plot_loc[0])
+        xloc_yloc_index = gridloc.index(self.values.loc[0])
         X = getattr(self.dom,'lon'+xloc[xloc_yloc_index])
         Y = getattr(self.dom,'lat'+xloc[xloc_yloc_index])
 
         gridloc = ['l','i']
         zloc = ['Layer','Interface']
-        zloc_index = gridloc.index(self.plot_loc[1])
+        zloc_index = gridloc.index(self.values.loc[1])
         Z = getattr(self.dom,zloc[zloc_index])
         T = self.Time
         axes = [T,Z,Y,X]
@@ -347,8 +347,8 @@ class GridVariable():
         if len(keep_axes) == 1:
             i = keep_axes[0]
             x = axes[i][self._plot_slice[i,0]:self._plot_slice[i,1]]
-            ax.plot(x,values,**plot_kwargs)
-            return fig
+            im = ax.plot(x,values,**plot_kwargs)
+            return ax
         elif len(keep_axes) == 2:
             i = keep_axes[0]
             y = axes[i][self._plot_slice[i,0]:self._plot_slice[i,1]]
@@ -357,9 +357,10 @@ class GridVariable():
 
             dx = np.diff(x)[0]
             dy = np.diff(y)[0]
-            extent = [y.min()-dx/2,y.max()+dx/2,y.min()-dy/2,y.max()+dy/2]
+            extent = [x.min()-dx/2,x.max()+dx/2,y.min()-dy/2,y.max()+dy/2]
             im = ax.imshow(values,origin='lower',extent=extent,
                            interpolation='none',
                            **plot_kwargs)
             ax.set_xlim(x.min(),x.max())
             ax.set_ylim(y.min(),y.max())
+            return ax
