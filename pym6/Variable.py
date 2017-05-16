@@ -1,8 +1,8 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from netCDF4 import Dataset as dset, MFDataset as mfdset
 from functools import partial
 import copy
+from .Plotter import plotter
 
 class GridNdarray(np.ndarray):
     """A class to hold a grid-located variable."""
@@ -22,17 +22,20 @@ class GridVariable():
 
     """A class to hold a variable."""
     def __init__(self,var,domain,loc,*fhl,**kwargs):
-        self.var = var
-        self.dom = domain
-        self.loc = loc
-        self.plot_loc = kwargs.get('plot_loc',self.loc)[0]
-        self._plot_slice = self.dom.slices[self.plot_loc].copy()
         for fh in fhl:
             try:
                 self._v = fh.variables[var]
             except KeyError:
                 pass
             else:
+                self._name = var
+                self._units = kwargs.get('units',None)
+                self._math = kwargs.get('math',None)
+                self.var = var
+                self.dom = domain
+                self.loc = loc
+                self.plot_loc = kwargs.get('plot_loc',self.loc)[0]
+                self._plot_slice = self.dom.slices[self.plot_loc].copy()
                 self.implement_syntactic_sugar_for_plot_slice()
                 self.Time = fh.variables['Time'][:]
                 self.dom.dt = np.diff(self.Time[:2])*3600
@@ -40,7 +43,6 @@ class GridVariable():
                 average_DT = average_DT[:,np.newaxis,np.newaxis,np.newaxis]
                 self.average_DT = average_DT
                 self._htol = kwargs.get('htol',1e-3)
-                self._units = kwargs.get('units',None)
                 self.dom.Interface = fh.variables['zi'][:]
                 break
 
@@ -114,6 +116,24 @@ class GridVariable():
         new_variable = copy.copy(self)
         new_variable.values = self.values*-1
         return new_variable
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self,name):
+        assert isinstance(name,str)
+        self._name = name
+
+    @property
+    def math(self):
+        return self._math
+
+    @math.setter
+    def math(self,math):
+        assert isinstance(math,str)
+        self._math = math
 
     @property
     def units(self):
@@ -318,53 +338,4 @@ class GridVariable():
         self.values = out_array
         return self
 
-    def plot(self,reduce_func,mean_axes,plot_kwargs={},**kwargs):
-        values = getattr(np,reduce_func)(self.values,axis = mean_axes)
-        gridloc = ['u','v','h','q']  # Four vertices of an Arakawa C-grid cell
-        xloc = ['q','h','h','q']     # X Location on the grid for variable in gridloc
-        yloc = ['h','q','h','q']     # Y Location on the grid for variable in gridloc
-
-        xloc_yloc_index = gridloc.index(self.values.loc[0])
-        X = getattr(self.dom,'lon'+xloc[xloc_yloc_index])
-        Y = getattr(self.dom,'lat'+xloc[xloc_yloc_index])
-
-        gridloc = ['l','i']
-        zloc = ['Layer','Interface']
-        zloc_index = gridloc.index(self.values.loc[1])
-        Z = getattr(self.dom,zloc[zloc_index])
-        T = self.Time
-        axes = [T,Z,Y,X]
-
-        keep_axes = ()
-        for i in range(4):
-            if i not in mean_axes:
-                keep_axes += (i,)
-
-        ax = kwargs.get('ax',None)
-        if ax is None:
-            fig,ax = plt.subplots(1,1)
-        
-        if len(keep_axes) == 1:
-            i = keep_axes[0]
-            x = axes[i][self._plot_slice[i,0]:self._plot_slice[i,1]]
-            im = ax.plot(x,values,**plot_kwargs)
-        elif len(keep_axes) == 2:
-            i = keep_axes[0]
-            y = axes[i][self._plot_slice[i,0]:self._plot_slice[i,1]]
-            i = keep_axes[1]
-            x = axes[i][self._plot_slice[i,0]:self._plot_slice[i,1]]
-
-            dx = np.diff(x)[0]
-            dy = np.diff(y)[0]
-            extent = [x.min()-dx/2,x.max()+dx/2,y.min()-dy/2,y.max()+dy/2]
-            im = ax.imshow(values,origin='lower',extent=extent,
-                           interpolation='none', aspect='auto',
-                           **plot_kwargs)
-            cbar = kwargs.get('cbar',False)
-            if cbar:
-                cbar = plt.colorbar(im,ax=ax)
-                cbar.formatter.set_powerlimits((-3, 4))
-                cbar.update_ticks()
-            ax.set_xlim(x.min(),x.max())
-            ax.set_ylim(y.min(),y.max())
-        return im
+GridVariable.plot = plotter
