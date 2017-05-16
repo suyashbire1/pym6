@@ -24,7 +24,7 @@ class GridVariable():
             try:
                 self._v = fh.variables[var]
             except KeyError:
-                print('Variable not found. Trying next file.')
+                pass
             else:
                 self.var = var
                 self.dom = domain
@@ -37,6 +37,7 @@ class GridVariable():
                 average_DT = fh.variables['average_DT'][:]
                 average_DT = average_DT[:,np.newaxis,np.newaxis,np.newaxis]
                 self.average_DT = average_DT
+                self._htol = kwargs.get('htol',1e-3)
                 break
 
         self._divisor = kwargs.get('divisor',None)
@@ -45,42 +46,66 @@ class GridVariable():
                 try:
                     self._div = fh.variables[self._divisor]
                 except KeyError:
-                    print('Divisor not found. Trying next file.')
+                    pass
                 else:
-                    self._htol = kwargs.get('htol',1e-3)
                     break
 
     def __add__(self,other):
-        if self.values.loc == other.values.loc:
-            new_variable = GridVariable(self.var,self.dom,self.values.loc)
-            new_variable.values = self.values + other.values
-            return new_variable
-        else:
-            raise ValueError('The two variables are not co-located.')
+        try:
+            if self.values.loc == other.values.loc:
+                new_variable = GridVariable(self.var,self.dom,self.values.loc)
+                new_variable.values = self.values + other.values
+                return new_variable
+            else:
+                raise ValueError('The two variables are not co-located.')
+        except AttributeError:
+            pass
+
+        self.values += other
+        return self
+
 
     def __sub__(self,other):
-        if self.values.loc == other.values.loc:
-            new_variable = GridVariable(self.var,self.dom,self.values.loc)
-            new_variable.values = self.values - other.values
-            return new_variable
-        else:
-            raise ValueError('The two variables are not co-located.')
+        try:
+            if self.values.loc == other.values.loc:
+                new_variable = GridVariable(self.var,self.dom,self.values.loc)
+                new_variable.values = self.values - other.values
+                return new_variable
+            else:
+                raise ValueError('The two variables are not co-located.')
+        except AttributeError:
+            pass
+
+        self.values -= other
+        return self
 
     def __mul__(self,other):
-        if self.values.loc == other.values.loc:
-            new_variable = GridVariable(self.var,self.dom,self.values.loc)
-            new_variable.values = self.values * other.values
-            return new_variable
-        else:
-            raise ValueError('The two variables are not co-located.')
+        try:
+            if self.values.loc == other.values.loc:
+                new_variable = GridVariable(self.var,self.dom,self.values.loc)
+                new_variable.values = self.values * other.values
+                return new_variable
+            else:
+                raise ValueError('The two variables are not co-located.')
+        except AttributeError:
+            pass
+
+        self.values *= other
+        return self
 
     def __div__(self,other):
-        if self.values.loc == other.values.loc:
-            new_variable = GridVariable(self.var,self.dom,self.values.loc)
-            new_variable.values = self.values / other.values
-            return new_variable
-        else:
-            raise ValueError('The two variables are not co-located.')
+        try:
+            if self.values.loc == other.values.loc:
+                new_variable = GridVariable(self.var,self.dom,self.values.loc)
+                new_variable.values = self.values / other.values
+                return new_variable
+            else:
+                raise ValueError('The two variables are not co-located.')
+        except AttributeError:
+            pass
+        
+        self.values /= other
+        return self
 
     def __neg__(self):
         self.values *= -1
@@ -139,9 +164,14 @@ class GridVariable():
     def read_array(self,extend_kwargs={},**kwargs):
         self._slice = self._slice_array_to_slice(self._plot_slice)
         out_array = self._v[self._slice]
+
+        filled = kwargs.get('filled',np.nan)
         if np.ma.isMaskedArray(out_array):
-            filled = kwargs.get('filled',np.nan)
             out_array = out_array.filled(filled)
+
+        set_min_value = kwargs.get('set_min_value',False)
+        if set_min_value:
+            out_array[out_array<self._htol] = filled
 
         tmean = kwargs.get('tmean',True)
         if tmean:
@@ -151,7 +181,6 @@ class GridVariable():
         if self._divisor:
             divisor = self._div[self._slice]
             if np.ma.isMaskedArray(divisor):
-                filled = kwargs.get('filled',np.nan)
                 divisor = divisor.filled(filled)
             if tmean:
                 dt = self.average_DT
