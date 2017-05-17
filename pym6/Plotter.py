@@ -18,7 +18,7 @@ def rhotoz(var,z,e,**kwargs):
         output_var = _vatz(var,z,e)
         output_var = output_var.astype(np.float32)
     elif var.ndim == 1:
-        kwargs.get('lin_interp',False)
+        lin_interp = kwargs.get('lin_interp',False)
         var = var.astype(np.float32)
         e = e.astype(np.float32)
         if lin_interp:
@@ -100,16 +100,15 @@ def plotter(self,reduce_func,mean_axes,plot_kwargs={},**kwargs):
         xlabel = axes_label[i] + ' (' + axes_units[i] + ')'
         x = axes[i]
 
-        perc = kwargs.get('perc',None)
-        if perc:
-            vlim = np.nanpercentile(np.fabs(values),perc)
-            vmin,vmax = -vlim,vlim
-            if 'vmin' in plot_kwargs:
-                vmin = plot_kwargs.get('vmin')
-                plot_kwargs.pop('vmin')
-            if 'vmax' in plot_kwargs:
-                vmax = plot_kwargs.get('vmax')
-                plot_kwargs.pop('vmax')
+        perc = kwargs.get('perc',100)
+        vlim = np.nanpercentile(np.fabs(values),perc)
+        vmin,vmax = -vlim,vlim
+        if 'vmin' in plot_kwargs:
+            vmin = plot_kwargs.get('vmin')
+            plot_kwargs.pop('vmin')
+        if 'vmax' in plot_kwargs:
+            vmax = plot_kwargs.get('vmax')
+            plot_kwargs.pop('vmax')
 
         dx = np.diff(x)[0]
         dy = np.diff(y)[0]
@@ -128,3 +127,40 @@ def plotter(self,reduce_func,mean_axes,plot_kwargs={},**kwargs):
         ax.set_xlim(x.min(),x.max())
         ax.set_ylim(y.min(),y.max())
     return im
+
+
+def budget_plot(budget_list,mean_axes,ncols=2,figsize=(6,6),
+                plot_kwargs={},plotter_kwargs={},**kwargs):
+    nfigs = len(budget_list)
+    nrows = np.int8(np.ceil(nfigs/ncols))
+    fig,ax = plt.subplots(nrows,ncols,sharex=True,sharey=True,figsize=figsize)
+    ax = ax.ravel()
+
+    perc = kwargs.get('perc',100)
+
+    individual_cbars = kwargs.get('individual_cbars',False)
+    plotter_kwargs['cbar'] = individual_cbars
+    if not individual_cbars:
+        vmax = 0
+        for budget in budget_list:
+            values = np.nanmean(budget.values,axis=mean_axes)
+            vmax = max(vmax,np.nanpercentile(np.fabs(values),perc))
+        plot_kwargs['vmin'] = -vmax
+        plot_kwargs['vmax'] = vmax
+    else:
+        plotter_kwargs['perc'] = perc
+    
+    for i,budget in enumerate(budget_list):
+        axc = ax[i]
+        plotter_kwargs['ax'] = axc
+        im = budget.plot('nanmean',mean_axes,plot_kwargs=plot_kwargs.copy(),
+                         **plotter_kwargs)
+        if i%2 == 1:
+            axc.set_ylabel('')
+        if np.ceil((i+1)/ncols) != nrows:
+            axc.set_xlabel('')
+    if not individual_cbars:
+        cbar = fig.colorbar(im,ax=ax.tolist())
+        cbar.formatter.set_powerlimits((-3, 4))
+        cbar.update_ticks()
+    return fig
