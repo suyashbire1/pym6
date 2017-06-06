@@ -304,8 +304,8 @@ class GridVariable():
             ne = possible_ne[self.values.loc[0]][axis]
             slice_array = self._modify_slice(axis,ns,ne)
             self._plot_slice = slice_array
-            _slice = self._slice_array_to_slice(slice_array)
-            divisor = possible_divisors[self.values.loc[0]][axis][_slice[2:]]
+            self._slice = self._slice_array_to_slice(slice_array)
+            divisor = possible_divisors[self.values.loc[0]][axis][self._slice[2:]]
         ddx = self.o1diff(axis).values/divisor
         self.values = ddx
         return self
@@ -332,6 +332,7 @@ class GridVariable():
         ne = possible_ne[loc[0]][axis]
         slice_array = self._modify_slice(axis,ns,ne)
         self._plot_slice = slice_array
+        self._slice = self._slice_array_to_slice(slice_array)
         out_array = 0.5*(  np.take(self.values,range(self.values.shape[axis]-1),axis=axis)
                          + np.take(self.values,range(1,self.values.shape[axis]),axis=axis)  )
         out_array.loc = new_loc

@@ -126,6 +126,9 @@ def plotter(self,reduce_func,mean_axes,plot_kwargs={},**kwargs):
             cbar.update_ticks()
         ax.set_xlim(x.min(),x.max())
         ax.set_ylim(y.min(),y.max())
+        if self.name:
+            tx = ax.text(0.05,0.2,self.name,transform=ax.transAxes)
+            tx.set_fontsize(15)
     return im
 
 
