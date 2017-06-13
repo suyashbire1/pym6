@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import pyximport
 pyximport.install()
 from .getvaratz import getvaratz as _vatz, getTatz as _Tatz, getTatzlin as _Tatzlin 
@@ -47,6 +48,10 @@ def plotter(self,reduce_func,mean_axes,plot_kwargs={},**kwargs):
     axes = [T,Z,Y,X]
     for i,axis in enumerate(axes):
         axes[i] = axis[self._plot_slice[i,0]:self._plot_slice[i,1]]
+    if hasattr(self,'atz') and self.atz:
+        axes[1] = self.z
+        axes_label[1] = 'z'
+        axes_units[1] = 'm'
 
     keep_axes = ()
     for i in range(4):
@@ -117,20 +122,34 @@ def plotter(self,reduce_func,mean_axes,plot_kwargs={},**kwargs):
                        vmin=vmin,vmax=vmax,
                        interpolation='none', aspect='auto',
                        **plot_kwargs)
+        contour=kwargs.get('contour',True)
+        if contour:
+            clevs = kwargs.get('clevs',np.linspace(vmin,vmax,4))
+            fmt = kwargs.get('fmt',"%1.3f")
+            CS = ax.contour(x,y,values,clevs,colors='k')
+            CS.clabel(inline=1,fmt=fmt)
+
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         cbar = kwargs.get('cbar',False)
         if cbar:
             cbar = plt.colorbar(im,ax=ax)
-            cbar.formatter.set_powerlimits((-3, 4))
+            cbar.formatter.set_powerlimits((-2, 2))
             cbar.update_ticks()
         ax.set_xlim(x.min(),x.max())
         ax.set_ylim(y.min(),y.max())
-        if self.name:
-            tx = ax.text(0.05,0.2,self.name,transform=ax.transAxes)
+        annotate = kwargs.get('annotate','name')
+        if hasattr(self,annotate):
+            tx = ax.text(0.05,0.2,getattr(self,annotate),transform=ax.transAxes)
             tx.set_fontsize(15)
-    return im
-
+        xtokm = kwargs.get('xtokm',False)
+        if xtokm:
+            xt = ax.get_xticks()
+            R = 6400
+            xtinkm = R*np.cos(np.mean(Y)*np.pi/180)*xt*np.pi/180
+            ax.set_xticklabels(['{:.0f}'.format(i) for i in xtinkm])
+            ax.set_xlabel('x from EB (km)')
+    return ax,im
 
 def budget_plot(budget_list,mean_axes,ncols=2,figsize=(6,6),
                 plot_kwargs={},plotter_kwargs={},**kwargs):

@@ -2,7 +2,7 @@ import numpy as np
 from netCDF4 import Dataset as dset, MFDataset as mfdset
 from functools import partial
 import copy
-from .Plotter import plotter
+from .Plotter import plotter, rhotoz
 
 class GridNdarray(np.ndarray):
     """A class to hold a grid-located variable."""
@@ -28,7 +28,7 @@ class GridVariable():
             except KeyError:
                 pass
             else:
-                self._name = var
+                self._name = kwargs.get('name',var)
                 self._units = kwargs.get('units',None)
                 self._math = kwargs.get('math',None)
                 self.var = var
@@ -39,11 +39,13 @@ class GridVariable():
                 self.implement_syntactic_sugar_for_plot_slice()
                 self.Time = fh.variables['Time'][:]
                 self.dom.dt = np.diff(self.Time[:2])*3600
-                average_DT = fh.variables['average_DT'][:]
-                average_DT = average_DT[:,np.newaxis,np.newaxis,np.newaxis]
-                self.average_DT = average_DT
+                if 'average_DT' in fh.variables.keys():
+                    average_DT = fh.variables['average_DT'][:]
+                    average_DT = average_DT[:,np.newaxis,np.newaxis,np.newaxis]
+                    self.average_DT = average_DT
                 self._htol = kwargs.get('htol',1e-3)
-                self.dom.Interface = fh.variables['zi'][:]
+                if 'zi' in fh.variables.keys():
+                    self.dom.Interface = fh.variables['zi'][:]
                 break
 
         self._divisor = kwargs.get('divisor',None)
@@ -227,7 +229,7 @@ class GridVariable():
             out_array /= self.dom.dxCv[self._slice[2:]]
 
         divide_by_dy = kwargs.get('divide_by_dy',False)
-        if divide_by_dx:
+        if divide_by_dy:
             out_array /= self.dom.dyCu[self._slice[2:]]
 
         divide_by_db = kwargs.get('divide_by_db',False)
@@ -299,6 +301,8 @@ class GridVariable():
                            q = [0,0,0,0])
         if axis == 1:
             divisor = possible_divisors[self.values.loc[0]][axis]
+            if hasattr(self,'atz') and self.atz:
+                divisor = self.dz
         else:
             ns = possible_ns[self.values.loc[0]][axis]
             ne = possible_ne[self.values.loc[0]][axis]
@@ -339,4 +343,23 @@ class GridVariable():
         self.values = out_array
         return self
 
-GridVariable.plot = plotter
+    plot = plotter
+
+    def toz(self,z,**kwargs):
+        self.z = np.array(z)
+        if self.z.size > 1:
+            self.dz = np.diff(z)[0]
+        values = self.values
+        rho = kwargs.get('rho',False)
+        if rho:
+            valuesz = rhotoz(self.dom.Layer,z,self.values,**kwargs)
+            valuesz = GridNdarray(valuesz,self.values.loc[0]+'l')
+        else:
+            e = kwargs.get('e')
+            kwargs.pop('e')
+            e = e.values
+            valuesz = rhotoz(values,z,e,**kwargs)
+            valuesz = GridNdarray(valuesz,self.values.loc)
+        self.values = valuesz
+        self.atz = True
+        return self
