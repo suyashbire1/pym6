@@ -175,7 +175,7 @@ def budget_plot(budget_list,mean_axes,ncols=2,figsize=(6,6),
     for i,budget in enumerate(budget_list):
         axc = ax[i]
         plotter_kwargs['ax'] = axc
-        im = budget.plot('nanmean',mean_axes,plot_kwargs=plot_kwargs.copy(),
+        _,im = budget.plot('nanmean',mean_axes,plot_kwargs=plot_kwargs.copy(),
                          **plotter_kwargs)
         if i%2 == 1:
             axc.set_ylabel('')
