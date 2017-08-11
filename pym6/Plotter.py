@@ -89,7 +89,7 @@ def plotter(self,reduce_func,mean_axes,plot_kwargs={},**kwargs):
     if ax is None:
         fig,ax = plt.subplots(1,1)
 
-    if len(keep_axes) == 1:
+    if len(values.shape) == 1:
         i = keep_axes[0]
         x = axes[i]
         im = ax.plot(x,values,**plot_kwargs)
@@ -97,7 +97,7 @@ def plotter(self,reduce_func,mean_axes,plot_kwargs={},**kwargs):
         if self.name and self.units:
             ax.set_ylabel(self.name + ' (' + self.units + ')')
 
-    elif len(keep_axes) == 2:
+    elif len(values.shape) == 2:
         i = keep_axes[0]
         ylabel = axes_label[i] + ' (' + axes_units[i] + ')'
         y = axes[i]
@@ -126,7 +126,7 @@ def plotter(self,reduce_func,mean_axes,plot_kwargs={},**kwargs):
         if contour:
             clevs = kwargs.get('clevs',np.linspace(vmin,vmax,4))
             fmt = kwargs.get('fmt',"%1.3f")
-            CS = ax.contour(x,y,values,clevs,colors='k')
+            CS = ax.contour(x,y,values,clevs,colors='k',linestyles='dashed')
             CS.clabel(inline=1,fmt=fmt)
 
         ax.set_xlabel(xlabel)
@@ -142,6 +142,7 @@ def plotter(self,reduce_func,mean_axes,plot_kwargs={},**kwargs):
         if hasattr(self,annotate):
             tx = ax.text(0.05,0.2,getattr(self,annotate),transform=ax.transAxes)
             tx.set_fontsize(15)
+            tx.set_bbox(dict(facecolor='white',alpha=1,edgecolor='white'))
         xtokm = kwargs.get('xtokm',False)
         if xtokm:
             xt = ax.get_xticks()
