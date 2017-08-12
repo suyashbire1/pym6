@@ -63,7 +63,7 @@ class GridVariable():
             new_variable = copy.copy(self)
             new_variable.values = self.values + other.values
             return new_variable
-        elif hasattr(other,'loc') and self.values.loc == other.loc: 
+        elif hasattr(other,'loc') and self.values.loc == other.loc:
             new_variable = copy.copy(self)
             new_variable.values = self.values + other
             return new_variable
@@ -77,7 +77,7 @@ class GridVariable():
             new_variable = copy.copy(self)
             new_variable.values = self.values - other.values
             return new_variable
-        elif hasattr(other,'loc') and self.values.loc == other.loc: 
+        elif hasattr(other,'loc') and self.values.loc == other.loc:
             new_variable = copy.copy(self)
             new_variable.values = self.values - other
             return new_variable
@@ -91,7 +91,7 @@ class GridVariable():
             new_variable = copy.copy(self)
             new_variable.values = self.values * other.values
             return new_variable
-        elif hasattr(other,'loc') and self.values.loc == other.loc: 
+        elif hasattr(other,'loc') and self.values.loc == other.loc:
             new_variable = copy.copy(self)
             new_variable.values = self.values * other
             return new_variable
@@ -105,7 +105,7 @@ class GridVariable():
             new_variable = copy.copy(self)
             new_variable.values = self.values / other.values
             return new_variable
-        elif hasattr(other,'loc') and self.values.loc == other.loc: 
+        elif hasattr(other,'loc') and self.values.loc == other.loc:
             new_variable = copy.copy(self)
             new_variable.values = self.values / other
             return new_variable
@@ -197,8 +197,18 @@ class GridVariable():
         return array
 
     def read_array(self,extend_kwargs={},**kwargs):
-        self._slice = self._slice_array_to_slice(self._plot_slice)
+        if np.any(self._plot_slice[:,0]<0):
+            plot_slice_temp = self._plot_slice.copy()
+            for slice_index in np.nditer(plot_slice_temp[:,0],
+                                         op_flags=['readwrite']):
+                if slice_index < 0:
+                    slice_index[...] = 0
+            self._slice = self._slice_array_to_slice(plot_slice_temp)
+        else:
+            self._slice = self._slice_array_to_slice(self._plot_slice)
         out_array = self._v[self._slice]
+        print(self.var,self._slice)
+        print(self.var,out_array.shape)
 
         filled = kwargs.get('filled',np.nan)
         if np.ma.isMaskedArray(out_array):
