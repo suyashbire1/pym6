@@ -58,6 +58,10 @@ class GridVariable():
                 else:
                     break
 
+    @property
+    def shape(self):
+        return self.values.shape if hasattr(self,'values') else None
+
     def __add__(self,other):
         if hasattr(other,'values') and self.values.loc == other.values.loc:
             new_variable = copy.copy(self)
@@ -174,9 +178,7 @@ class GridVariable():
                     string = axis+limit+op
                     setattr(self,string,partial(self.plot_slice_modifier,string))
 
-
-    @staticmethod
-    def extend_halos(array,axis,boundary_index,**kwargs):
+    def extend_halos(self,array,axis,boundary_index,**kwargs):
         method = kwargs.get('method')
         if method == 'vorticity':
             slip = kwargs.get('slip',False)
@@ -186,6 +188,9 @@ class GridVariable():
             array_extendor = array.take([boundary_index],axis=axis)
         elif method == 'zeros':
             array_extendor = np.zeros(array.take([boundary_index],axis=axis).shape)
+        elif method == 'symmetric':
+            select_index = 1 if boundary_index == 0 else -2
+            array_extendor = array.take([select_index],axis=axis)
 
         if boundary_index == 0:
             array1 = array_extendor
@@ -207,8 +212,6 @@ class GridVariable():
         else:
             self._slice = self._slice_array_to_slice(self._plot_slice)
         out_array = self._v[self._slice]
-        print(self.var,self._slice)
-        print(self.var,out_array.shape)
 
         filled = kwargs.get('filled',np.nan)
         if np.ma.isMaskedArray(out_array):
@@ -320,6 +323,20 @@ class GridVariable():
             self._plot_slice = slice_array
             self._slice = self._slice_array_to_slice(slice_array)
             divisor = possible_divisors[self.values.loc[0]][axis][self._slice[2:]]
+        extend_kwargs = {'method':'mirror'}
+        if self._plot_slice[2,0] < 0:
+            divisor = self.extend_halos(divisor,axis=0,
+                                        boundary_index=0,**extend_kwargs)
+        if self._plot_slice[2,1] > self.dom.total_ylen:
+            divisor = self.extend_halos(divisor,axis=0,
+                                        boundary_index=-1,**extend_kwargs)
+        if self._plot_slice[3,0] < 0:
+            divisor = self.extend_halos(divisor,axis=1,
+                                        boundary_index=0,**extend_kwargs)
+        if self._plot_slice[3,1] > self.dom.total_xlen:
+            divisor = self.extend_halos(divisor,axis=1,
+                                        boundary_index=-1,**extend_kwargs)
+
         ddx = self.o1diff(axis).values/divisor
         self.values = ddx
         return self
