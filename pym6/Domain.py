@@ -38,9 +38,7 @@ class Domain(Grid):
         self.slat = slat
         self.nlat = nlat
         self.ls = kwargs.get('ls',0)
-        self.le = kwargs.get('le',self.Layer.size+1)
-        if self.le is None:
-            self.le = self.Layer.size+1
+        self.le = kwargs.get('le',None)
         self.ts = kwargs.get('ts',0)
         self.te = kwargs.get('te',None)
         self.stride_x = kwargs.get('stride_x',1)
