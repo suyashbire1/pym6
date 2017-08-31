@@ -28,6 +28,10 @@ class Initializer():
         self.stride_t = kwargs.get('stride_t',1)
         self.meanax = kwargs.get('meanax',(0,2))
 
+        for key, value in kwargs.items():
+            if not hasattr(self,key):
+                setattr(self,key,value)
+
 class Grid():
 
     """ A class to hold grid metrics from MOM6."""
@@ -59,7 +63,7 @@ class Domain2(Grid):
     def __init__(self,geofil,vgeofil,
                       wlon,elon,slat,nlat,
                       **kwargs):
-        super(Domain, self).__init__(geofil,vgeofil)
+        super(Domain2, self).__init__(geofil,vgeofil)
         self.wlon = wlon
         self.elon = elon
         self.slat = slat
