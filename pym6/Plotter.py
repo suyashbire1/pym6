@@ -226,7 +226,7 @@ def budget_plot(budget_list,
             mean_axes,
             plot_kwargs=plot_kwargs.copy(),
             **plotter_kwargs)
-        if i % 2 == 1:
+        if i % ncols != 0:
             axc.set_ylabel('')
         if np.ceil((i + 1) / ncols) != nrows:
             axc.set_xlabel('')

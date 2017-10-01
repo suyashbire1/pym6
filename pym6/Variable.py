@@ -60,7 +60,8 @@ class GridVariable():
                 self.Time = fh.variables['Time'][:]
                 self.dom.dt = np.diff(self.Time[:2]) * 3600
                 if 'average_DT' in fh.variables.keys():
-                    average_DT = fh.variables['average_DT'][:]
+                    average_DT = fh.variables['average_DT'][self._plot_slice[
+                        0, 0]:self._plot_slice[0, 1]]
                     average_DT = average_DT[:, np.newaxis, np.newaxis, np.
                                             newaxis]
                     self.average_DT = average_DT
@@ -247,9 +248,13 @@ class GridVariable():
         tmean = kwargs.get('tmean', True)
         if tmean:
             dt = self.average_DT
-            out_array = np.apply_over_axes(np.sum, out_array * dt,
-                                           0) / np.sum(dt)
-            self._plot_slice[0, 1] = 1
+            out_array_mean = np.apply_over_axes(np.sum, out_array * dt,
+                                                0) / np.sum(dt)
+            if tmean is 'anom':
+                out_array -= out_array_mean
+            else:
+                out_array = out_array_mean
+                self._plot_slice[0, 1] = 1
 
         if self._divisor:
             divisor = self._div[self._slice]
@@ -388,11 +393,11 @@ class GridVariable():
             axis = possible_hlocs[loc[0]].index(new_loc[0]) + 2
         elif new_loc[1] is not loc[1]:
             axis = 1
-        #ns = possible_ns[loc[0]][axis]
-        #ne = possible_ne[loc[0]][axis]
-        #slice_array = self._modify_slice(axis, ns, ne)
-        #self._plot_slice = slice_array
-        #self._slice = self._slice_array_to_slice(slice_array)
+        ns = possible_ns[loc[0]][axis]
+        ne = possible_ne[loc[0]][axis]
+        slice_array = self._modify_slice(axis, ns, ne)
+        self._plot_slice = slice_array
+        self._slice = self._slice_array_to_slice(slice_array)
         out_array = 0.5 * (np.take(
             self.values, range(self.values.shape[axis] - 1),
             axis=axis) + np.take(
@@ -420,4 +425,14 @@ class GridVariable():
             valuesz = GridNdarray(valuesz, self.values.loc)
         self.values = valuesz
         self.atz = True
+        return self
+
+    def vert_integral(self):
+        self.values = np.cumsum(
+            (self.values * self.dom.db)[:, ::-1], axis=1)[:, ::-1]
+        #self.values = -np.cumsum((self.values * self.dom.db), axis=1)
+        return self
+
+    def mean(self, axis=[0, 1, 2, 3]):
+        self.values = np.mean(self.values, axis=axis, keepdims=True)
         return self
