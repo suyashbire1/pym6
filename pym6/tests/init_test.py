@@ -67,19 +67,78 @@ def test_get_location():
         assert rv.vloc == 'l'
 
 
-def test_restrict_location():
+def test_meridional_domain():
     slat, nlat = 30, 40
-    wlon, elon = -10, -5
     with dset('/home/sbire/pym6/pym6/tests/data/ocean_geometry.nc') as fh:
         for loc in ['h', 'q']:
             var = 'lat' + loc
             lat = fh.variables[var][:]
             lat_restricted = lat[(lat >= slat) & (lat <= nlat)]
-            a, b, _ = Variable2.MeridionalDomain(fh, slat, nlat).indices[loc]
-            assert np.allclose(lat_restricted, lat[a:b])
+            a, b, c = Variable2.MeridionalDomain(fh, slat, nlat,
+                                                 1).indices['y' + loc]
+            assert np.allclose(lat_restricted, lat[a:b:c])
+
+
+def test_zonal_domain():
+    wlon, elon = -10, -5
+    with dset('/home/sbire/pym6/pym6/tests/data/ocean_geometry.nc') as fh:
+        for loc in ['h', 'q']:
+            var = 'lon' + loc
+            lon = fh.variables[var][:]
+            lon_restricted = lon[(lon >= wlon) & (lon <= elon)]
+            a, b, c = Variable2.ZonalDomain(fh, wlon, elon, 1).indices['x'
+                                                                       + loc]
+            assert np.allclose(lon_restricted, lon[a:b:c])
+
+
+def test_stride_meridional_domain():
+    slat, nlat = 30, 40
+    with dset('/home/sbire/pym6/pym6/tests/data/ocean_geometry.nc') as fh:
+        for stride in range(2, 4):
+            for loc in ['h', 'q']:
+                var = 'lat' + loc
+                lat = fh.variables[var][:]
+                lat_restricted = lat[(lat >= slat) & (lat <= nlat)]
+                lat_restricted = lat_restricted[::stride]
+                a, b, c = Variable2.MeridionalDomain(fh, slat, nlat,
+                                                     stride).indices['y' + loc]
+                assert np.allclose(lat_restricted, lat[a:b:c])
+
+
+def test_stride_zonal_domain():
+    wlon, elon = -10, -5
+    with dset('/home/sbire/pym6/pym6/tests/data/ocean_geometry.nc') as fh:
+        for stride in range(2, 4):
+            for loc in ['h', 'q']:
+                var = 'lon' + loc
+                lon = fh.variables[var][:]
+                lon_restricted = lon[(lon >= wlon) & (lon <= elon)]
+                lon_restricted = lon_restricted[::stride]
+                a, b, c = Variable2.ZonalDomain(fh, wlon, elon,
+                                                stride).indices['x' + loc]
+                assert np.allclose(lon_restricted, lon[a:b:c])
+
+
+def test_horizontal_domain():
+    slat, nlat = 30, 40
+    wlon, elon = -10, -5
+    with dset('/home/sbire/pym6/pym6/tests/data/ocean_geometry.nc') as fh:
+        initializer = dict(
+            fhgeo=fh,
+            south_lat=slat,
+            north_lat=nlat,
+            west_lon=wlon,
+            east_lon=elon)
+        hdomain = Variable2.HorizontalDomain(initializer)
+        for loc in ['h', 'q']:
+            var = 'lat' + loc
+            lat = fh.variables[var][:]
+            lat_restricted = lat[(lat >= slat) & (lat <= nlat)]
+            a, b, c = hdomain.indices['y' + loc]
+            assert np.allclose(lat_restricted, lat[a:b:c])
 
             var = 'lon' + loc
             lon = fh.variables[var][:]
             lon_restricted = lon[(lon >= wlon) & (lon <= elon)]
-            a, b, _ = Variable2.ZonalDomain(fh, wlon, elon).indices[loc]
-            assert np.allclose(lon_restricted, lon[a:b])
+            a, b, c = hdomain.indices['x' + loc]
+            assert np.allclose(lon_restricted, lon[a:b:c])

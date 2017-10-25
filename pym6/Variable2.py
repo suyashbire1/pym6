@@ -13,27 +13,42 @@ def find_index_limits(dimension, start, end):
 
 
 class MeridionalDomain():
-    def __init__(self, fhgeo, south_lat, north_lat, stride=1):
+    def __init__(self, fhgeo, south_lat, north_lat, stride):
         """Initializes meridional domain limits."""
         lath = fhgeo.variables['lath'][:]
         latq = fhgeo.variables['latq'][:]
-        self.indices = {}
-        self.indices['h'] = *find_index_limits(lath, south_lat,
-                                               north_lat), stride
-        self.indices['q'] = *find_index_limits(latq, south_lat,
-                                               north_lat), stride
+        if hasattr(self, 'indices') is False:
+            self.indices = {}
+        self.indices['yh'] = *find_index_limits(lath, south_lat,
+                                                north_lat), stride
+        self.indices['yq'] = *find_index_limits(latq, south_lat,
+                                                north_lat), stride
 
 
 class ZonalDomain():
-    def __init__(self, fhgeo, west_lon, east_lon, stride=1):
+    def __init__(self, fhgeo, west_lon, east_lon, stride):
         """Initializes zonal domain limits."""
         lonh = fhgeo.variables['lonh'][:]
         lonq = fhgeo.variables['lonq'][:]
-        self.indices = {}
-        self.indices['h'] = *find_index_limits(lonh, west_lon,
-                                               east_lon), stride
-        self.indices['q'] = *find_index_limits(lonq, west_lon,
-                                               east_lon), stride
+        if hasattr(self, 'indices') is False:
+            self.indices = {}
+        self.indices['xh'] = *find_index_limits(lonh, west_lon,
+                                                east_lon), stride
+        self.indices['xq'] = *find_index_limits(lonq, west_lon,
+                                                east_lon), stride
+
+
+class HorizontalDomain(MeridionalDomain, ZonalDomain):
+    def __init__(self, initializer):
+        fhgeo = initializer.get('fhgeo')
+        south_lat = initializer.get('south_lat')
+        north_lat = initializer.get('north_lat')
+        west_lon = initializer.get('west_lon')
+        east_lon = initializer.get('east_lon')
+        stridex = initializer.get('stridex', 1)
+        stridey = initializer.get('stridey', 1)
+        MeridionalDomain.__init__(self, fhgeo, south_lat, north_lat, stridey)
+        ZonalDomain.__init__(self, fhgeo, west_lon, east_lon, stridex)
 
 
 class GridVariable():
