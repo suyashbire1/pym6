@@ -6,6 +6,7 @@ Initializer = Domain.Initializer
 from netCDF4 import Dataset as dset
 import numpy as np
 import unittest
+import pytest
 
 
 def test_location():
@@ -205,6 +206,7 @@ class test_variable(unittest.TestCase):
             west_lon=self.west_lon,
             east_lon=self.east_lon)
         self.vars = ['e', 'u', 'v', 'wparam', 'RV']
+        self.initializer_full_domain = dict(fhgeo=self.fhgeo)
 
     def tearDown(self):
         self.fh.close()
@@ -229,6 +231,24 @@ class test_variable(unittest.TestCase):
             gvvar = gv3(var, self.fh,
                         **self.initializer).get_slice().read().array
             self.assertIsInstance(gvvar, np.ndarray)
+
+    def test_array_full(self):
+        for var in self.vars:
+            gvvar = gv3(
+                var, self.fh,
+                **self.initializer_full_domain).get_slice().read().array
+            var_array = self.fh.variables[var][:]
+            self.assertTrue(np.allclose(gvvar, var_array))
+
+    def test_boundary_conditions(self):
+        for var in self.vars:
+            gvvar = gv3(var, self.fh,
+                        **self.initializer_full_domain).xsm().xep().ysm().yep(
+                        ).get_slice().read().array
+            var_array = self.fh.variables[var][:]
+            self.assertTrue(
+                np.allclose(gvvar, var_array),
+                msg=f'{gvvar.shape},{var_array.shape}')
 
     def test_final_locs(self):
         hlocs = ['h', 'u', 'v', 'q']
@@ -260,3 +280,74 @@ class test_variable(unittest.TestCase):
                     gvvar = getattr(gvvar, dim + op)()
                     b = gvvar.indices[gvvar.final_dimensions[i + 1]]
                     self.assertEqual(a[j] + plusminus[j], b[j])
+
+
+class BC(Variable2.BoundaryCondition):
+    def __init__(self, bc_type, array, axis, start_or_end):
+        self.array = array
+        Variable2.BoundaryCondition.__init__(self, bc_type, axis, start_or_end)
+
+
+@pytest.fixture(params=range(4))
+def axis(request):
+    return request.param
+
+
+@pytest.fixture(params=[0, -1])
+def start_or_end(request):
+    return request.param
+
+
+@pytest.fixture(params=['zeros', 'mirror', 'circsymh', 'circsymq'])
+def bc_type(request):
+    return request.param
+
+
+def test_create_halo(bc_type, axis, start_or_end):
+    dummy_array = np.arange(2 * 3 * 5 * 7).reshape(2, 3, 5, 7)
+    dummy_BC = BC(bc_type, dummy_array, axis, start_or_end)
+    dummy_BC = dummy_BC.create_halo()
+    if dummy_BC.bc_type == 'circsymq':
+        take_index = 1 if start_or_end == 0 else -2
+        compare_array = dummy_array.take([take_index], axis=axis)
+    elif dummy_BC.bc_type == 'zeros':
+        compare_array = np.zeros(
+            dummy_array.take([start_or_end], axis=axis).shape)
+    else:
+        compare_array = dummy_array.take([start_or_end], axis=axis)
+    assert np.all(dummy_BC.halo == compare_array)
+
+
+def test_dummy_BC_append_halo(bc_type, axis, start_or_end):
+    dummy_array = np.arange(2 * 3 * 5 * 7).reshape(2, 3, 5, 7)
+    dummy_BC = BC(bc_type, dummy_array, axis, start_or_end)
+    dummy_BC = dummy_BC.create_halo()
+    dummy_BC = dummy_BC.append_halo_to_array()
+    if start_or_end == 0:
+        if bc_type == 'circsymq':
+            array1 = -dummy_array.take([1], axis=axis)
+        elif bc_type == 'circsymh':
+            array1 = -dummy_array.take([start_or_end], axis=axis)
+        elif dummy_BC.bc_type == 'zeros':
+            array1 = np.zeros(
+                dummy_array.take([start_or_end], axis=axis).shape)
+        else:
+            array1 = dummy_array.take([start_or_end], axis=axis)
+        array2 = dummy_array
+    elif start_or_end == -1:
+        array1 = dummy_array
+        if bc_type == 'circsymq':
+            array2 = -dummy_array.take([-2], axis=axis)
+        elif bc_type == 'circsymh':
+            array2 = -dummy_array.take([start_or_end], axis=axis)
+        elif dummy_BC.bc_type == 'zeros':
+            array2 = np.zeros(
+                dummy_array.take([start_or_end], axis=axis).shape)
+        else:
+            array2 = dummy_array.take([start_or_end], axis=axis)
+    dummy_array = np.concatenate((array1, array2), axis=axis)
+    assert np.all(dummy_BC.array == dummy_array)
+
+
+if __name__ == '__main__':
+    unittest.main()
