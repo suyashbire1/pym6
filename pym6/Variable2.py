@@ -1,9 +1,7 @@
 import numpy as np
 from netCDF4 import Dataset as dset, MFDataset as mfdset
-from functools import partial
-import copy
 from .Plotter import plotter, rhotoz
-from functools import wraps, partialmethod
+from functools import wraps, partial, partialmethod
 
 
 def find_index_limits(dimension, start, end):
@@ -16,47 +14,45 @@ def find_index_limits(dimension, start, end):
 class MeridionalDomain():
     def __init__(self, **initializer):
         """Initializes meridional domain limits."""
-        fhgeo = initializer.get('fhgeo')
+        fh = initializer.get('fh')
         stride = initializer.get('stridey', 1)
-        lath = fhgeo.variables['lath'][:]
-        south_lat = initializer.get('south_lat', lath[0])
-        north_lat = initializer.get('north_lat', lath[-1])
+        yh = fh.variables['yh'][:]
+        south_lat = initializer.get('south_lat', yh[0])
+        north_lat = initializer.get('north_lat', yh[-1])
         if hasattr(self, 'indices') is False:
             self.indices = {}
         if hasattr(self, 'dim_arrays') is False:
             self.dim_arrays = {}
-        self.indices['yh'] = *find_index_limits(lath, south_lat,
+        self.indices['yh'] = *find_index_limits(yh, south_lat,
                                                 north_lat), stride
-        self.dim_arrays['yh'] = lath
-        latq = fhgeo.variables['latq'][:]
-        south_lat = initializer.get('south_lat', latq[0])
-        north_lat = initializer.get('north_lat', latq[-1])
-        self.indices['yq'] = *find_index_limits(latq, south_lat,
+        self.dim_arrays['yh'] = yh
+        yq = fh.variables['yq'][:]
+        south_lat = initializer.get('south_lat', yq[0])
+        north_lat = initializer.get('north_lat', yq[-1])
+        self.indices['yq'] = *find_index_limits(yq, south_lat,
                                                 north_lat), stride
-        self.dim_arrays['yq'] = latq
+        self.dim_arrays['yq'] = yq
 
 
 class ZonalDomain():
     def __init__(self, **initializer):
         """Initializes zonal domain limits."""
-        fhgeo = initializer.get('fhgeo')
+        fh = initializer.get('fh')
         stride = initializer.get('stridex', 1)
-        lonh = fhgeo.variables['lonh'][:]
-        west_lon = initializer.get('west_lon', lonh[0])
-        east_lon = initializer.get('east_lon', lonh[-1])
+        xh = fh.variables['xh'][:]
+        west_lon = initializer.get('west_lon', xh[0])
+        east_lon = initializer.get('east_lon', xh[-1])
         if hasattr(self, 'indices') is False:
             self.indices = {}
         if hasattr(self, 'dim_arrays') is False:
             self.dim_arrays = {}
-        self.indices['xh'] = *find_index_limits(lonh, west_lon,
-                                                east_lon), stride
-        self.dim_arrays['xh'] = lonh
-        lonq = fhgeo.variables['lonq'][:]
-        west_lon = initializer.get('west_lon', lonq[0])
-        east_lon = initializer.get('east_lon', lonq[-1])
-        self.indices['xq'] = *find_index_limits(lonq, west_lon,
-                                                east_lon), stride
-        self.dim_arrays['xq'] = lonq
+        self.indices['xh'] = *find_index_limits(xh, west_lon, east_lon), stride
+        self.dim_arrays['xh'] = xh
+        xq = fh.variables['xq'][:]
+        west_lon = initializer.get('west_lon', xq[0])
+        east_lon = initializer.get('east_lon', xq[-1])
+        self.indices['xq'] = *find_index_limits(xq, west_lon, east_lon), stride
+        self.dim_arrays['xq'] = xq
 
 
 class HorizontalDomain(MeridionalDomain, ZonalDomain):
@@ -116,6 +112,16 @@ class Domain(TemporalDomain, VerticalDomain, HorizontalDomain):
         HorizontalDomain.__init__(self, **initializer)
 
 
+class LazyNumpyOperation():
+    def __init__(self, func, *args, **kwargs):
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+
+    def __call__(self, array):
+        return self.func(array, *self.args, **self.kwargs)
+
+
 class BoundaryCondition():
     def __init__(self, bc_type, axis, start_or_end):
         self.bc_type = bc_type
@@ -123,53 +129,53 @@ class BoundaryCondition():
         self.start_or_end = start_or_end
 
     def set_halo_indices(self):
-        if self.array is None:
-            raise AttributeError('Array does not exist.')
         if self.bc_type == 'circsymq':
-            self.take_index = 1 if self.start_or_end == 0 else -2
+            take_index = 1 if self.start_or_end == 0 else -2
         else:
-            self.take_index = self.start_or_end
+            take_index = self.start_or_end
+        return take_index
 
-    def create_halo(self):
-        self.set_halo_indices()
-        self.halo = np.take(self.array, [self.take_index], axis=self.axis)
+    def create_halo(self, array):
+        take_index = self.set_halo_indices()
+        self.halo = np.take(array, [take_index], axis=self.axis)
         if self.bc_type == 'zeros':
             self.halo = np.zeros(self.halo.shape)
-        return self
 
     def boudary_condition_type(self):
         if self.bc_type != 'mirror':
             self.halo = -self.halo
 
-    def append_halo_to_array(self):
+    def append_halo_to_array(self, array):
         self.boudary_condition_type()
         if self.start_or_end == 0:
             array1 = self.halo
-            array2 = self.array
+            array2 = array
         elif self.start_or_end == -1:
-            array1 = self.array
+            array1 = array
             array2 = self.halo
-        self.array = np.concatenate((array1, array2), axis=self.axis)
-        return self
+        array = np.concatenate((array1, array2), axis=self.axis)
+        return array
+
+    def __call__(self, array):
+        self.create_halo(array)
+        return self.append_halo_to_array(array)
 
 
 class GridVariable2(Domain):
     _loc_registry_hor = dict(
         u=['yh', 'xq'], v=['yq', 'xh'], h=['yh', 'xh'], q=['yq', 'xq'])
     _loc_registry_ver = dict(l='zl', i='zi')
-    BC = dict(
-        u=[('circsymh', 2, 1), ('circsymq', 3, 1), ('circsymh', 2, 0),
-           ('circsymq', 3, 0), ('mirror', 1, 0), ('zeros', 1, 1)],
-        v=[('circsymq', 2, 1), ('circsymh', 3, 1), ('circsymq', 2, 0),
-           ('circsymh', 3, 0), ('mirror', 1, 0), ('zeros', 1, 1)],
-        h=[('circsymh', 2, 1), ('circsymh', 3, 1), ('circsymh', 2, 0),
-           ('circsymh', 3, 0), ('mirror', 1, 0), ('zeros', 1, 1)],
-        q=[('circsymq', 2, 1), ('circsymq', 3, 1), ('circsymq', 2, 0),
-           ('circsymq', 3, 0), ('mirror', 1, 0), ('zeros', 1, 1)])
 
-    def __init__(self, var, fh, final_loc=None, **initializer):
+    def __init__(self,
+                 var,
+                 fh,
+                 final_loc=None,
+                 bc_type=None,
+                 fillvalue=np.nan,
+                 **initializer):
         self._v = fh.variables[var]
         self._dimensions = self._v.dimensions
+        self._fillvalue = fillvalue
         self.determine_location()
         initializer['fh'] = fh
         Domain.__init__(self, **initializer)
@@ -179,6 +185,8 @@ class GridVariable2(Domain):
         else:
             self._final_loc = self._hloc + self._vloc
             self._final_dimensions = self._dimensions
+        self._bc_type = bc_type
+        self.array = None
         self.operations = []
 
     def determine_location(self):
@@ -233,17 +241,45 @@ class GridVariable2(Domain):
         return self
 
     def read(self):
-        self.array = self._v[self._slice]
+        def lazy_read_and_fill(array):
+            array = self._v[self._slice]
+            if np.ma.isMaskedArray(array):
+                array = array.filled(self._fillvalue)
+            return array
+
+        self.operations.append(lazy_read_and_fill)
+        self.implement_BC_if_necessary()
         return self
 
-    def update_boundaries(self):
+    BoundaryCondition = BoundaryCondition
+    _default_bc_type = dict(
+        u=['mirror', 'circsymh', 'circsymh', 'circsymh', 'zeros', 'circsymq'],
+        v=['mirror', 'circsymh', 'zeros', 'circsymq', 'circsymh', 'circsymh'],
+        h=['mirror', 'circsymh', 'mirror', 'mirror', 'mirror', 'mirror'],
+        q=['mirror', 'circsymh', 'zeros', 'circsymq', 'zeros', 'circsymq'])
+
+    def implement_BC_if_necessary(self):
         dims = self._dimensions
-        for i, dim in enumerate(dims):
+        if self._bc_type is None:
+            self._bc_type = self._default_bc_type
+        for i, dim in enumerate(dims[1:]):
             indices = self.indices[dim]
+            loc = self._hloc
             if indices[0] < 0:
-                BoundaryCondition.__init__(self, *BC[self._hloc])
-            if indices[1] > self.dim_arrays[actual_dim].size:
-                BoundaryCondition.__init__(self, *BC[self._hloc])
+                bc_type = self._bc_type[loc][2 * i]
+                self.operations.append(
+                    self.BoundaryCondition(bc_type[0], i + 1, 0))
+            if indices[1] > self.dim_arrays[dim].size:
+                bc_type = self._bc_type[loc][2 * i + 1]
+                self.operations.append(
+                    self.BoundaryCondition(bc_type[1], i + 1, -1))
+
+    LazyNumpyOperation = LazyNumpyOperation
+
+    def np_ops(self, npfunc, *args, **kwargs):
+        self.operations.append(
+            self.LazyNumpyOperation(npfunc, *args, **kwargs))
+        return self
 
     @property
     def dimensions(self):
@@ -269,49 +305,15 @@ class GridVariable2(Domain):
         i : interface."""
         return self._vloc
 
-    def lazily_evaluate(self, func):
-        @wraps(func)
-        def decorated(*args, **kwargs):
-            self.operations.append(func, args, kwargs)
-
-        return decorated
-
     def compute(self):
         for ops in self.operations:
-            self.array = ops()
-
-
-class GridVariable():
-    """A class to hold a variable."""
-
-    def __init__(self, var, domain, fh, **kwargs):
-        self._v = fh.variables[var]
-        self._dims = self._v.dimensions
-        self._name = kwargs.get('name', var)
-        self._units = kwargs.get('units', None)
-        self._math = kwargs.get('math', None)
-        self.var = var
-        self.domain = domain
-        self.determine_location()
-
-    def determine_location(self):
-        dims = self._dims
-        if 'xh' in dims and 'yh' in dims:
-            self._hloc = 'h'
-        elif 'xq' in dims and 'yq' in dims:
-            self._hloc = 'q'
-        elif 'xq' in dims and 'yh' in dims:
-            self._hloc = 'u'
-        elif 'xh' in dims and 'yq' in dims:
-            self._hloc = 'v'
-        if 'zl' in dims:
-            self._vloc = 'l'
-        elif 'zi' in dims:
-            self._vloc = 'i'
+            self.array = ops(self.array)
+        self.operations = []
+        return self
 
     @property
     def shape(self):
-        return self.values.shape if hasattr(self, 'values') else None
+        return self.array.shape if hasattr(self, 'array') else None
 
     @property
     def name(self):
@@ -339,19 +341,3 @@ class GridVariable():
     def units(self, units):
         assert isinstance(units, str)
         self._units = units
-
-    @property
-    def hloc(self):
-        """Horizontal location of the variable on the grid.
-        h : tracer,
-        q : vorticity,
-        u : zonal velocity,
-        v : meridional velocity."""
-        return self._hloc
-
-    @property
-    def vloc(self):
-        """Vertical location of the variable on the grid.
-        l : layer,
-        i : interface."""
-        return self._vloc

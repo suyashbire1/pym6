@@ -1,6 +1,5 @@
 from pym6 import Variable, Variable2, Domain, Plotter
 gv = Variable.GridVariable
-gv2 = Variable2.GridVariable
 gv3 = Variable2.GridVariable2
 Initializer = Domain.Initializer
 from netCDF4 import Dataset as dset
@@ -42,43 +41,13 @@ def test_location():
     assert np.all(rv == rv1)
 
 
-def test_get_location():
-    initializer = Initializer(
-        geofil='/home/sbire/pym6/pym6/tests/data/ocean_geometry.nc',
-        vgeofil='/home/sbire/pym6/pym6/tests/data/Vertical_coordinate.nc',
-        fil='/home/sbire/pym6/pym6/tests/data/output__0001_12_009.nc',
-        wlon=-25,
-        elon=0,
-        slat=10,
-        nlat=60)
-    dom = Domain.Domain(initializer)
-    with dset(initializer.fil) as fh:
-        e = gv2('e', dom, fh)  #.read_array().values
-        assert e.hloc == 'h'
-        assert e.vloc == 'i'
-        u = gv2('u', dom, fh)  #.read_array().values
-        assert u.hloc == 'u'
-        assert u.vloc == 'l'
-        v = gv2('v', dom, fh)  #.read_array().values
-        assert v.hloc == 'v'
-        assert v.vloc == 'l'
-        wparam = gv2('wparam', dom, fh)  #.read_array().values
-        assert wparam.hloc == 'h'
-        assert wparam.vloc == 'l'
-        rv = gv2('RV', dom, fh)  #.read_array().values
-        assert rv.hloc == 'q'
-        assert rv.vloc == 'l'
-
-
 class test_domain(unittest.TestCase):
     def setUp(self):
         self.slat, self.nlat = 30, 40
         self.wlon, self.elon = -10, -5
-        self.fhgeo = dset('/home/sbire/pym6/pym6/tests/data/ocean_geometry.nc')
         self.fh = dset(
             '/home/sbire/pym6/pym6/tests/data/output__0001_12_009.nc')
         self.initializer = dict(
-            fhgeo=self.fhgeo,
             fh=self.fh,
             south_lat=self.slat,
             north_lat=self.nlat,
@@ -86,13 +55,12 @@ class test_domain(unittest.TestCase):
             east_lon=self.elon)
 
     def tearDown(self):
-        self.fhgeo.close()
         self.fh.close()
 
     def test_meridional_domain(self):
         for loc in ['h', 'q']:
-            var = 'lat' + loc
-            lat = self.fhgeo.variables[var][:]
+            var = 'y' + loc
+            lat = self.fh.variables[var][:]
             lat_restricted = lat[(lat >= self.slat) & (lat <= self.nlat)]
             a, b, c = Variable2.MeridionalDomain(
                 **self.initializer).indices['y' + loc]
@@ -100,8 +68,8 @@ class test_domain(unittest.TestCase):
 
     def test_zonal_domain(self):
         for loc in ['h', 'q']:
-            var = 'lon' + loc
-            lon = self.fhgeo.variables[var][:]
+            var = 'x' + loc
+            lon = self.fh.variables[var][:]
             lon_restricted = lon[(lon >= self.wlon) & (lon <= self.elon)]
             a, b, c = Variable2.ZonalDomain(**self.initializer).indices['x'
                                                                         + loc]
@@ -111,8 +79,8 @@ class test_domain(unittest.TestCase):
         for stride in range(2, 4):
             self.initializer['stridey'] = stride
             for loc in ['h', 'q']:
-                var = 'lat' + loc
-                lat = self.fhgeo.variables[var][:]
+                var = 'y' + loc
+                lat = self.fh.variables[var][:]
                 lat_restricted = lat[(lat >= self.slat) & (lat <= self.nlat)]
                 lat_restricted = lat_restricted[::stride]
                 a, b, c = Variable2.MeridionalDomain(
@@ -123,8 +91,8 @@ class test_domain(unittest.TestCase):
         for stride in range(2, 4):
             self.initializer['stridex'] = stride
             for loc in ['h', 'q']:
-                var = 'lon' + loc
-                lon = self.fhgeo.variables[var][:]
+                var = 'x' + loc
+                lon = self.fh.variables[var][:]
                 lon_restricted = lon[(lon >= self.wlon) & (lon <= self.elon)]
                 lon_restricted = lon_restricted[::stride]
                 a, b, c = Variable2.ZonalDomain(
@@ -136,14 +104,14 @@ class test_domain(unittest.TestCase):
         self.initializer['stridex'] = 1
         self.initializer['stridey'] = 1
         for loc in ['h', 'q']:
-            var = 'lat' + loc
-            lat = self.fhgeo.variables[var][:]
+            var = 'y' + loc
+            lat = self.fh.variables[var][:]
             lat_restricted = lat[(lat >= self.slat) & (lat <= self.nlat)]
             a, b, c = hdomain.indices['y' + loc]
             self.assertTrue(np.allclose(lat_restricted, lat[a:b:c]))
 
-            var = 'lon' + loc
-            lon = self.fhgeo.variables[var][:]
+            var = 'x' + loc
+            lon = self.fh.variables[var][:]
             lon_restricted = lon[(lon >= self.wlon) & (lon <= self.elon)]
             a, b, c = hdomain.indices['x' + loc]
             self.assertTrue(np.allclose(lon_restricted, lon[a:b:c]))
@@ -196,21 +164,17 @@ class test_variable(unittest.TestCase):
     def setUp(self):
         self.south_lat, self.north_lat = 30, 40
         self.west_lon, self.east_lon = -10, -5
-        self.fhgeo = dset('/home/sbire/pym6/pym6/tests/data/ocean_geometry.nc')
         self.fh = dset(
             '/home/sbire/pym6/pym6/tests/data/output__0001_12_009.nc')
         self.initializer = dict(
-            fhgeo=self.fhgeo,
             south_lat=self.south_lat,
             north_lat=self.north_lat,
             west_lon=self.west_lon,
             east_lon=self.east_lon)
         self.vars = ['e', 'u', 'v', 'wparam', 'RV']
-        self.initializer_full_domain = dict(fhgeo=self.fhgeo)
 
     def tearDown(self):
         self.fh.close()
-        self.fhgeo.close()
 
     def test_locations(self):
         hlocs = ['h', 'u', 'v', 'h', 'q']
@@ -229,26 +193,50 @@ class test_variable(unittest.TestCase):
     def test_array(self):
         for var in self.vars:
             gvvar = gv3(var, self.fh,
-                        **self.initializer).get_slice().read().array
+                        **self.initializer).get_slice().read().compute().array
             self.assertIsInstance(gvvar, np.ndarray)
 
     def test_array_full(self):
         for var in self.vars:
-            gvvar = gv3(
-                var, self.fh,
-                **self.initializer_full_domain).get_slice().read().array
+            gvvar = gv3(var, self.fh).get_slice().read().compute().array
             var_array = self.fh.variables[var][:]
             self.assertTrue(np.allclose(gvvar, var_array))
 
+    def test_array_full_fillvalue(self):
+        for i, fill in enumerate([np.nan, 0]):
+            gvvar = gv3(
+                'u', self.fh,
+                fillvalue=fill).get_slice().read().compute().array
+            if i == 0:
+                self.assertTrue(np.all(np.isnan(gvvar[:, :, :, -1])))
+            else:
+                self.assertTrue(
+                    np.all(gvvar[:, :, :, -1] == 0),
+                    msg=f'{gvvar[:, :, :, -1]}')
+
+    def test_numpy_func(self):
+        for var in self.vars:
+            gvvar = gv3(
+                var, self.fh, fillvalue=0).get_slice().read().np_ops(
+                    np.mean, keepdims=True).compute().array
+            var_array = self.fh.variables[var][:]
+            if np.ma.isMaskedArray(var_array):
+                var_array = var_array.filled(0)
+            var_array = np.mean(var_array, keepdims=True)
+            self.assertTrue(
+                np.allclose(gvvar, var_array), msg=f'{gvvar,var_array}')
+
     def test_boundary_conditions(self):
         for var in self.vars:
-            gvvar = gv3(var, self.fh,
-                        **self.initializer_full_domain).xsm().xep().ysm().yep(
-                        ).get_slice().read().array
+            gvvar = gv3(var, self.fh).xsm().xep().ysm().yep().get_slice().read(
+            ).compute().array
             var_array = self.fh.variables[var][:]
-            self.assertTrue(
-                np.allclose(gvvar, var_array),
-                msg=f'{gvvar.shape},{var_array.shape}')
+            shape1 = gvvar.shape
+            shape2 = var_array.shape
+            self.assertTrue(shape1[0] == shape2[0])
+            self.assertTrue(shape1[1] == shape2[1])
+            self.assertTrue(shape1[2] == shape2[2] + 2)
+            self.assertTrue(shape1[3] == shape2[3] + 2)
 
     def test_final_locs(self):
         hlocs = ['h', 'u', 'v', 'q']
@@ -282,12 +270,6 @@ class test_variable(unittest.TestCase):
                     self.assertEqual(a[j] + plusminus[j], b[j])
 
 
-class BC(Variable2.BoundaryCondition):
-    def __init__(self, bc_type, array, axis, start_or_end):
-        self.array = array
-        Variable2.BoundaryCondition.__init__(self, bc_type, axis, start_or_end)
-
-
 @pytest.fixture(params=range(4))
 def axis(request):
     return request.param
@@ -305,8 +287,8 @@ def bc_type(request):
 
 def test_create_halo(bc_type, axis, start_or_end):
     dummy_array = np.arange(2 * 3 * 5 * 7).reshape(2, 3, 5, 7)
-    dummy_BC = BC(bc_type, dummy_array, axis, start_or_end)
-    dummy_BC = dummy_BC.create_halo()
+    dummy_BC = Variable2.BoundaryCondition(bc_type, axis, start_or_end)
+    dummy_BC.create_halo(dummy_array)
     if dummy_BC.bc_type == 'circsymq':
         take_index = 1 if start_or_end == 0 else -2
         compare_array = dummy_array.take([take_index], axis=axis)
@@ -320,9 +302,9 @@ def test_create_halo(bc_type, axis, start_or_end):
 
 def test_dummy_BC_append_halo(bc_type, axis, start_or_end):
     dummy_array = np.arange(2 * 3 * 5 * 7).reshape(2, 3, 5, 7)
-    dummy_BC = BC(bc_type, dummy_array, axis, start_or_end)
-    dummy_BC = dummy_BC.create_halo()
-    dummy_BC = dummy_BC.append_halo_to_array()
+    dummy_BC = Variable2.BoundaryCondition(bc_type, axis, start_or_end)
+    dummy_BC.create_halo(dummy_array)
+    array = dummy_BC.append_halo_to_array(dummy_array)
     if start_or_end == 0:
         if bc_type == 'circsymq':
             array1 = -dummy_array.take([1], axis=axis)
@@ -346,7 +328,7 @@ def test_dummy_BC_append_halo(bc_type, axis, start_or_end):
         else:
             array2 = dummy_array.take([start_or_end], axis=axis)
     dummy_array = np.concatenate((array1, array2), axis=axis)
-    assert np.all(dummy_BC.array == dummy_array)
+    assert np.all(array == dummy_array)
 
 
 if __name__ == '__main__':
