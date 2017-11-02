@@ -1,7 +1,7 @@
 import numpy as np
-from netCDF4 import Dataset as dset, MFDataset as mfdset
-from .Plotter import plotter, rhotoz
-from functools import wraps, partial, partialmethod
+# from netCDF4 import Dataset as dset, MFDataset as mfdset
+# from .Plotter import plotter, rhotoz
+from functools import partial, partialmethod
 
 
 def find_index_limits(dimension, start, end):
@@ -76,7 +76,7 @@ class VerticalDomain():
             self.indices['zl'] = *find_index_limits(zl, low_density,
                                                     high_density), stride
             self.dim_arrays['zl'] = zl
-        except:
+        except KeyError:
             pass
         try:
             zi = fh.variables['zi'][:]
@@ -85,7 +85,7 @@ class VerticalDomain():
             self.indices['zi'] = *find_index_limits(zi, low_density,
                                                     high_density), stride
             self.dim_arrays['zi'] = zi
-        except:
+        except KeyError:
             pass
 
 
@@ -216,14 +216,17 @@ class GridVariable2(Domain):
         axis_indices = list(self.indices[dim])
         axis_indices[startend] += value
         self.indices[dim] = tuple(axis_indices)
+
+    def modify_index_return_self(self, axis, startend, value):
+        self.modify_index(axis, startend, value)
         return self
 
-    xsm = partialmethod(modify_index, 3, 0, -1)
-    xep = partialmethod(modify_index, 3, 1, 1)
-    ysm = partialmethod(modify_index, 2, 0, -1)
-    yep = partialmethod(modify_index, 2, 1, 1)
-    zsm = partialmethod(modify_index, 1, 0, -1)
-    zep = partialmethod(modify_index, 1, 1, 1)
+    xsm = partialmethod(modify_index_return_self, 3, 0, -1)
+    xep = partialmethod(modify_index_return_self, 3, 1, 1)
+    ysm = partialmethod(modify_index_return_self, 2, 0, -1)
+    yep = partialmethod(modify_index_return_self, 2, 1, 1)
+    zsm = partialmethod(modify_index_return_self, 1, 0, -1)
+    zep = partialmethod(modify_index_return_self, 1, 1, 1)
 
     def get_slice(self):
         self._slice = []
@@ -280,6 +283,45 @@ class GridVariable2(Domain):
         self.operations.append(
             self.LazyNumpyOperation(npfunc, *args, **kwargs))
         return self
+
+    @staticmethod
+    def vertical_move(array):
+        return 0.5 * (array[:, :-1, :, :] + array[:, 1:, :, :])
+
+    @staticmethod
+    def check_possible_movements_for_move(current_loc, new_loc):
+        possible_from_to = dict(
+            u=['q', 'h'], v=['h', 'q'], h=['v', 'u'], q=['u', 'v'])
+        possible_ns = dict(
+            u=[0, 0, 0, 1], v=[0, 0, 1, 0], h=[0, 0, 0, 0], q=[0, 0, -1, -1])
+        possible_ne = dict(
+            u=[0, -1, -1, 0],
+            v=[0, -1, 0, -1],
+            h=[0, -1, -1, -1],
+            q=[0, -1, 0, 0])
+
+        axis = possible_from_to[current_loc].index(new_loc) + 2
+        ns = possible_ns[current_loc][axis]
+        ne = possible_ne[current_loc][axis]
+        return (axis, ns, ne)
+
+    def horizontal_move(axis, array):
+        return 0.5 * (np.take(array, range(array.shape[axis] - 1), axis=axis) +
+                      np.take(array, range(1, array.shape[axis]), axis=axis))
+
+    def move_to(self, new_loc):
+        if new_loc in ['l', 'i'] and new_loc != self._vloc:
+            self.modify_index(1, 1, -1)
+            if self._vloc == 'l':
+                self.modify_index(1, 0, 1)
+            self.operations.append(self.vertical_move)
+        elif new_loc in ['u', 'v', 'h', 'q'] and new_loc != self._hloc:
+            axis, ns, ne = self.check_possible_movements_for_move(
+                self._hloc, new_loc)
+            self.modify_index(axis, 0, ns)
+            self.modify_index(axis, 1, ne)
+            move = partial(self.horizontal_move, axis)
+            self.operations.append(move)
 
     @property
     def dimensions(self):
