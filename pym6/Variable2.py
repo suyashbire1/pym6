@@ -1,7 +1,6 @@
 import numpy as np
-# from netCDF4 import Dataset as dset, MFDataset as mfdset
-# from .Plotter import plotter, rhotoz
 from functools import partial, partialmethod
+from collections import OrderedDict
 
 
 def find_index_limits(dimension, start, end):
@@ -16,22 +15,28 @@ class MeridionalDomain():
         """Initializes meridional domain limits."""
         fh = initializer.get('fh')
         stride = initializer.get('stridey', 1)
-        yh = fh.variables['yh'][:]
-        south_lat = initializer.get('south_lat', yh[0])
-        north_lat = initializer.get('north_lat', yh[-1])
         if hasattr(self, 'indices') is False:
             self.indices = {}
         if hasattr(self, 'dim_arrays') is False:
             self.dim_arrays = {}
-        self.indices['yh'] = *find_index_limits(yh, south_lat,
-                                                north_lat), stride
-        self.dim_arrays['yh'] = yh
-        yq = fh.variables['yq'][:]
-        south_lat = initializer.get('south_lat', yq[0])
-        north_lat = initializer.get('north_lat', yq[-1])
-        self.indices['yq'] = *find_index_limits(yq, south_lat,
-                                                north_lat), stride
-        self.dim_arrays['yq'] = yq
+        try:
+            yh = fh.variables['yh'][:]
+            south_lat = initializer.get('south_lat', yh[0])
+            north_lat = initializer.get('north_lat', yh[-1])
+            self.indices['yh'] = *find_index_limits(yh, south_lat,
+                                                    north_lat), stride
+            self.dim_arrays['yh'] = yh
+        except KeyError:
+            pass
+        try:
+            yq = fh.variables['yq'][:]
+            south_lat = initializer.get('south_lat', yq[0])
+            north_lat = initializer.get('north_lat', yq[-1])
+            self.indices['yq'] = *find_index_limits(yq, south_lat,
+                                                    north_lat), stride
+            self.dim_arrays['yq'] = yq
+        except KeyError:
+            pass
 
 
 class ZonalDomain():
@@ -39,20 +44,28 @@ class ZonalDomain():
         """Initializes zonal domain limits."""
         fh = initializer.get('fh')
         stride = initializer.get('stridex', 1)
-        xh = fh.variables['xh'][:]
-        west_lon = initializer.get('west_lon', xh[0])
-        east_lon = initializer.get('east_lon', xh[-1])
         if hasattr(self, 'indices') is False:
             self.indices = {}
         if hasattr(self, 'dim_arrays') is False:
             self.dim_arrays = {}
-        self.indices['xh'] = *find_index_limits(xh, west_lon, east_lon), stride
-        self.dim_arrays['xh'] = xh
-        xq = fh.variables['xq'][:]
-        west_lon = initializer.get('west_lon', xq[0])
-        east_lon = initializer.get('east_lon', xq[-1])
-        self.indices['xq'] = *find_index_limits(xq, west_lon, east_lon), stride
-        self.dim_arrays['xq'] = xq
+        try:
+            xh = fh.variables['xh'][:]
+            west_lon = initializer.get('west_lon', xh[0])
+            east_lon = initializer.get('east_lon', xh[-1])
+            self.indices['xh'] = *find_index_limits(xh, west_lon,
+                                                    east_lon), stride
+            self.dim_arrays['xh'] = xh
+        except KeyError:
+            pass
+        try:
+            xq = fh.variables['xq'][:]
+            west_lon = initializer.get('west_lon', xq[0])
+            east_lon = initializer.get('east_lon', xq[-1])
+            self.indices['xq'] = *find_index_limits(xq, west_lon,
+                                                    east_lon), stride
+            self.dim_arrays['xq'] = xq
+        except KeyError:
+            pass
 
 
 class HorizontalDomain(MeridionalDomain, ZonalDomain):
@@ -162,19 +175,15 @@ class BoundaryCondition():
 
 
 class GridVariable2(Domain):
-    _loc_registry_hor = dict(
-        u=['yh', 'xq'], v=['yq', 'xh'], h=['yh', 'xh'], q=['yq', 'xq'])
-    _loc_registry_ver = dict(l='zl', i='zi')
-
     def __init__(self,
                  var,
                  fh,
                  final_loc=None,
                  bc_type=None,
-                 fillvalue=np.nan,
+                 fillvalue=0,
                  **initializer):
         self._v = fh.variables[var]
-        self._dimensions = self._v.dimensions
+        self._current_dimensions = list(self._v.dimensions)
         self._fillvalue = fillvalue
         self.determine_location()
         initializer['fh'] = fh
@@ -183,33 +192,56 @@ class GridVariable2(Domain):
             self._final_loc = final_loc
             self.get_final_location_dimensions()
         else:
-            self._final_loc = self._hloc + self._vloc
-            self._final_dimensions = self._dimensions
+            self._final_loc = self._current_hloc + self._current_vloc
+            self._final_dimensions = tuple(self._current_dimensions)
         self._bc_type = bc_type
         self.array = None
         self.operations = []
 
     def determine_location(self):
-        dims = self._dimensions
+        dims = self._current_dimensions
         if 'xh' in dims and 'yh' in dims:
-            self._hloc = 'h'
+            self._current_hloc = 'h'
         elif 'xq' in dims and 'yq' in dims:
-            self._hloc = 'q'
+            self._current_hloc = 'q'
         elif 'xq' in dims and 'yh' in dims:
-            self._hloc = 'u'
+            self._current_hloc = 'u'
         elif 'xh' in dims and 'yq' in dims:
-            self._hloc = 'v'
+            self._current_hloc = 'v'
         if 'zl' in dims:
-            self._vloc = 'l'
+            self._current_vloc = 'l'
         elif 'zi' in dims:
-            self._vloc = 'i'
+            self._current_vloc = 'i'
+
+    def return_dimensions(self):
+        dims = self._current_dimensions
+        return_dims = OrderedDict()
+        for dim in dims:
+            start, stop, stride = self.indices[dim]
+            return_dims[dim] = self.dim_arrays[dim][start:stop:stride]
+        return return_dims
+
+    @staticmethod
+    def get_dimensions_by_location(loc):
+        loc_registry_hor = dict(
+            u=['yh', 'xq'], v=['yq', 'xh'], h=['yh', 'xh'], q=['yq', 'xq'])
+        loc_registry_ver = dict(l='zl', i='zi')
+        hloc = loc[0]
+        vloc = loc[1]
+        vdim = loc_registry_ver[vloc]
+        hdims = loc_registry_hor[hloc]
+        return tuple(['Time', vdim, *hdims])
+
+    def get_current_location_dimensions(self, loc):
+        self._current_hloc = loc[0]
+        self._current_vloc = loc[1]
+        self._current_dimensions = list(self.get_dimensions_by_location(loc))
 
     def get_final_location_dimensions(self):
         self._final_hloc = self._final_loc[0]
         self._final_vloc = self._final_loc[1]
-        final_vdim = self._loc_registry_ver[self._final_vloc]
-        final_hdims = self._loc_registry_hor[self._final_hloc]
-        self._final_dimensions = tuple(['Time', final_vdim, *final_hdims])
+        self._final_dimensions = self.get_dimensions_by_location(
+            self._final_loc)
 
     def modify_index(self, axis, startend, value):
         dim = self._final_dimensions[axis]
@@ -231,14 +263,14 @@ class GridVariable2(Domain):
     def get_slice(self):
         self._slice = []
         dims = self._final_dimensions
-        actual_dims = self._dimensions
+        current_dims = self._current_dimensions
         for i, dim in enumerate(dims):
             indices = list(self.indices[dim])
             if indices[0] < 0:
                 indices[0] = 0
-            actual_dim = actual_dims[i]
-            if indices[1] > self.dim_arrays[actual_dim].size:
-                indices[1] = self.dim_arrays[actual_dim].size
+            current_dim = current_dims[i]
+            if indices[1] > self.dim_arrays[current_dim].size:
+                indices[1] = self.dim_arrays[current_dim].size
             self._slice.append(slice(*indices))
         self._slice = tuple(self._slice)
         return self
@@ -262,20 +294,20 @@ class GridVariable2(Domain):
         q=['mirror', 'circsymh', 'zeros', 'circsymq', 'zeros', 'circsymq'])
 
     def implement_BC_if_necessary(self):
-        dims = self._dimensions
+        dims = self._current_dimensions
         if self._bc_type is None:
             self._bc_type = self._default_bc_type
         for i, dim in enumerate(dims[1:]):
             indices = self.indices[dim]
-            loc = self._hloc
+            loc = self._current_hloc
             if indices[0] < 0:
                 bc_type = self._bc_type[loc][2 * i]
                 self.operations.append(
-                    self.BoundaryCondition(bc_type[0], i + 1, 0))
+                    self.BoundaryCondition(bc_type, i + 1, 0))
             if indices[1] > self.dim_arrays[dim].size:
                 bc_type = self._bc_type[loc][2 * i + 1]
                 self.operations.append(
-                    self.BoundaryCondition(bc_type[1], i + 1, -1))
+                    self.BoundaryCondition(bc_type, i + 1, -1))
 
     LazyNumpyOperation = LazyNumpyOperation
 
@@ -305,27 +337,47 @@ class GridVariable2(Domain):
         ne = possible_ne[current_loc][axis]
         return (axis, ns, ne)
 
+    @staticmethod
     def horizontal_move(axis, array):
         return 0.5 * (np.take(array, range(array.shape[axis] - 1), axis=axis) +
                       np.take(array, range(1, array.shape[axis]), axis=axis))
 
+    def adjust_dimensions_and_indices_for_vertical_move(self):
+        self.modify_index(1, 1, -1)
+        if self._current_vloc == 'l':
+            self.modify_index(1, 0, 1)
+            self._current_dimensions[1] = 'zi'
+        else:
+            self._current_dimensions[1] = 'zl'
+        self.determine_location()
+
+    def adjust_dimensions_and_indices_for_horizontal_move(self, axis, ns, ne):
+        self.modify_index(axis, 0, ns)
+        self.modify_index(axis, 1, ne)
+        current_dimension = list(self._current_dimensions[axis])
+        if current_dimension[1] == 'h':
+            current_dimension[1] = 'q'
+        elif current_dimension[1] == 'q':
+            current_dimension[1] = 'h'
+        self._current_dimensions[axis] = "".join(current_dimension)
+        self.determine_location()
+
     def move_to(self, new_loc):
-        if new_loc in ['l', 'i'] and new_loc != self._vloc:
-            self.modify_index(1, 1, -1)
-            if self._vloc == 'l':
-                self.modify_index(1, 0, 1)
+        if new_loc in ['l', 'i'] and new_loc != self._current_vloc:
+            self.adjust_dimensions_and_indices_for_vertical_move()
             self.operations.append(self.vertical_move)
-        elif new_loc in ['u', 'v', 'h', 'q'] and new_loc != self._hloc:
+        elif new_loc in ['u', 'v', 'h', 'q'] and new_loc != self._current_hloc:
             axis, ns, ne = self.check_possible_movements_for_move(
-                self._hloc, new_loc)
-            self.modify_index(axis, 0, ns)
-            self.modify_index(axis, 1, ne)
+                self._current_hloc, new_loc)
+            self.adjust_dimensions_and_indices_for_horizontal_move(
+                axis, ns, ne)
             move = partial(self.horizontal_move, axis)
             self.operations.append(move)
+        return self
 
     @property
     def dimensions(self):
-        return self._dimensions
+        return tuple(self._current_dimensions)
 
     @property
     def final_dimensions(self):
@@ -338,14 +390,14 @@ class GridVariable2(Domain):
         q : vorticity,
         u : zonal velocity,
         v : meridional velocity."""
-        return self._hloc
+        return self._current_hloc
 
     @property
     def vloc(self):
         """Vertical location of the variable on the grid.
         l : layer,
         i : interface."""
-        return self._vloc
+        return self._current_vloc
 
     def compute(self):
         for ops in self.operations:
