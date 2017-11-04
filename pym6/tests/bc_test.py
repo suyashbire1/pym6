@@ -1,6 +1,5 @@
 from pym6 import Variable, Variable2, Domain
 import numpy as np
-import unittest
 import pytest
 gv = Variable.GridVariable
 gv3 = Variable2.GridVariable2
@@ -66,7 +65,3 @@ def test_dummy_BC_append_halo(bc_type, axis, start_or_end):
             array2 = dummy_array.take([start_or_end], axis=axis)
     dummy_array = np.concatenate((array1, array2), axis=axis)
     assert np.all(array == dummy_array)
-
-
-if __name__ == '__main__':
-    unittest.main()

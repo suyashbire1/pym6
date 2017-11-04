@@ -2,7 +2,6 @@ from pym6 import Variable, Variable2, Domain
 from netCDF4 import Dataset as dset
 import numpy as np
 import unittest
-import pytest
 gv = Variable.GridVariable
 gv3 = Variable2.GridVariable2
 Initializer = Domain.Initializer

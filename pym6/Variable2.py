@@ -1,6 +1,7 @@
 import numpy as np
 from functools import partial, partialmethod
 from collections import OrderedDict
+from netCDF4 import Dataset as dset
 
 
 def find_index_limits(dimension, start, end):
@@ -8,6 +9,25 @@ def find_index_limits(dimension, start, end):
     useful_index = np.nonzero((dimension >= start) & (dimension <= end))[0]
     lims = useful_index[0], useful_index[-1] + 1
     return lims
+
+
+class GridGeometry():
+    def __init__(self, filename):
+        with dset(filename) as fh:
+            for var in fh.variables:
+                setattr(self, var, fh.variables[var][:])
+
+    def get_divisor_for_diff(self, loc, axis, weights=None):
+        axis = axis - 2
+        divisors = dict(
+            u=['dyBu', 'dxT'],
+            v=['dyT', 'dxBu'],
+            h=['dyCv', 'dxCu'],
+            q=['dyCu', 'dxCv'])
+        if weights == 'area':
+            divisors['u'] = ['Aq', 'Ah']
+            divisors['v'] = ['Ah', 'Aq']
+        return getattr(self, divisors[loc][axis])
 
 
 class MeridionalDomain():
@@ -183,6 +203,7 @@ class GridVariable2(Domain):
                  fillvalue=0,
                  **initializer):
         self._v = fh.variables[var]
+        self._initial_dimensions = list(self._v.dimensions)
         self._current_dimensions = list(self._v.dimensions)
         self._fillvalue = fillvalue
         self.determine_location()
@@ -195,6 +216,7 @@ class GridVariable2(Domain):
             self._final_loc = self._current_hloc + self._current_vloc
             self._final_dimensions = tuple(self._current_dimensions)
         self._bc_type = bc_type
+        self.geometry = initializer.get('geometry', None)
         self.array = None
         self.operations = []
 
@@ -214,7 +236,7 @@ class GridVariable2(Domain):
             self._current_vloc = 'i'
 
     def return_dimensions(self):
-        dims = self._current_dimensions
+        dims = self._final_dimensions
         return_dims = OrderedDict()
         for dim in dims:
             start, stop, stride = self.indices[dim]
@@ -260,7 +282,7 @@ class GridVariable2(Domain):
     zsm = partialmethod(modify_index_return_self, 1, 0, -1)
     zep = partialmethod(modify_index_return_self, 1, 1, 1)
 
-    def get_slice(self):
+    def get_slice1(self):
         self._slice = []
         dims = self._final_dimensions
         current_dims = self._current_dimensions
@@ -274,6 +296,28 @@ class GridVariable2(Domain):
             self._slice.append(slice(*indices))
         self._slice = tuple(self._slice)
         return self
+
+    def get_slice(self):
+        #assert self._final_dimensions == tuple(self._current_dimensions)
+        self._slice = []
+        for axis in range(4):
+            indices = self.get_slice_by_axis(axis)
+            self._slice.append(slice(*indices))
+        self._slice = tuple(self._slice)
+        return self
+
+    def get_slice_by_axis(self, axis):
+        dims = self._final_dimensions
+        dim = dims[axis]
+        indices = list(self.indices[dim])
+        if indices[0] < 0:
+            indices[0] = 0
+        if indices[1] > self.dim_arrays[dim].size:
+            if axis != 1 or self._initial_dimensions[1] != 'zi':
+                indices[1] = self.dim_arrays[dim].size
+            else:
+                indices[1] = self.dim_arrays['zi'].size
+        return indices
 
     def read(self):
         def lazy_read_and_fill(array):
@@ -294,7 +338,7 @@ class GridVariable2(Domain):
         q=['mirror', 'circsymh', 'zeros', 'circsymq', 'zeros', 'circsymq'])
 
     def implement_BC_if_necessary(self):
-        dims = self._current_dimensions
+        dims = self._final_dimensions
         if self._bc_type is None:
             self._bc_type = self._default_bc_type
         for i, dim in enumerate(dims[1:]):
@@ -304,10 +348,12 @@ class GridVariable2(Domain):
                 bc_type = self._bc_type[loc][2 * i]
                 self.operations.append(
                     self.BoundaryCondition(bc_type, i + 1, 0))
-            if indices[1] > self.dim_arrays[dim].size:
-                bc_type = self._bc_type[loc][2 * i + 1]
-                self.operations.append(
-                    self.BoundaryCondition(bc_type, i + 1, -1))
+            if (indices[1] > self.dim_arrays[dim].size):
+                # if i != 0 or self._current_vloc != 'i':
+                if i != 0 or self._initial_dimensions[1] != 'zi':
+                    bc_type = self._bc_type[loc][2 * i + 1]
+                    self.operations.append(
+                        self.BoundaryCondition(bc_type, i + 1, -1))
 
     LazyNumpyOperation = LazyNumpyOperation
 
@@ -324,17 +370,13 @@ class GridVariable2(Domain):
     def check_possible_movements_for_move(current_loc, new_loc):
         possible_from_to = dict(
             u=['q', 'h'], v=['h', 'q'], h=['v', 'u'], q=['u', 'v'])
-        possible_ns = dict(
-            u=[0, 0, 0, 1], v=[0, 0, 1, 0], h=[0, 0, 0, 0], q=[0, 0, -1, -1])
-        possible_ne = dict(
-            u=[0, -1, -1, 0],
-            v=[0, -1, 0, -1],
-            h=[0, -1, -1, -1],
-            q=[0, -1, 0, 0])
+        possible_ns = dict(u=[0, 1], v=[1, 0], h=[0, 0], q=[1, 1])
+        possible_ne = dict(u=[-1, 0], v=[0, -1], h=[-1, -1], q=[0, 0])
 
-        axis = possible_from_to[current_loc].index(new_loc) + 2
+        axis = possible_from_to[current_loc].index(new_loc)
         ns = possible_ns[current_loc][axis]
         ne = possible_ne[current_loc][axis]
+        axis += 2
         return (axis, ns, ne)
 
     @staticmethod
@@ -374,6 +416,12 @@ class GridVariable2(Domain):
             move = partial(self.horizontal_move, axis)
             self.operations.append(move)
         return self
+
+    def dbyd(self, axis, weights=None):
+        divisor = self.geometry.get_divisor_for_diff(
+            self._current_hloc, axis, weights=weights)
+        dadx = partial(lambda x, a: np.diff(a, 1, axis=x) / divisor, axis)
+        self.operations.append(dadx)
 
     @property
     def dimensions(self):

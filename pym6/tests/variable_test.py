@@ -2,9 +2,9 @@ from pym6 import Variable, Variable2, Domain
 from netCDF4 import Dataset as dset
 import numpy as np
 import unittest
-import pytest
 gv = Variable.GridVariable
 gv3 = Variable2.GridVariable2
+geom = Variable2.GridGeometry
 Initializer = Domain.Initializer
 
 
@@ -47,6 +47,7 @@ class test_variable(unittest.TestCase):
         self.west_lon, self.east_lon = -10, -5
         self.fh = dset(
             '/home/sbire/pym6/pym6/tests/data/output__0001_12_009.nc')
+        self.geom = geom('/home/sbire/pym6/pym6/tests/data/ocean_geometry.nc')
         self.initializer = dict(
             south_lat=self.south_lat,
             north_lat=self.north_lat,
@@ -149,3 +150,10 @@ class test_variable(unittest.TestCase):
                     gvvar = getattr(gvvar, dim + op)()
                     b = gvvar.indices[gvvar.final_dimensions[i + 1]]
                     self.assertEqual(a[j] + plusminus[j], b[j])
+
+    def test_diff(self):
+        for var in self.vars:
+            gvvar = gv3(
+                var, self.fh, geometry=self.geom,
+                **self.initializer).get_slice().read().compute().array
+            self.assertIsInstance(gvvar, np.ndarray)
