@@ -651,3 +651,40 @@ class test_move(unittest.TestCase):
         db = 9.8 / 1031 * (zi[3] - zi[2])
         du = np.diff(u, axis=1) / db
         self.assertTrue(np.allclose(du, gvvar))
+
+    def test_move_u_subset_xarray(self):
+        ops = ['yep', 'xsm']
+        new_loc = ['q', 'h']
+        for i, op in enumerate(ops):
+            gvvar = getattr(
+                gv3('u',
+                    self.fh,
+                    final_loc=new_loc[i] + 'l',
+                    **self.initializer), op)().get_slice().read().move_to(
+                        new_loc[i])
+            dims = gvvar.return_dimensions()
+            gvvar = gvvar.to_DataArray()
+            for j, (key, value) in enumerate(dims.items()):
+                self.assertTrue(
+                    value.size == gvvar.shape[j],
+                    msg=f'{value.size,gvvar.shape[j]}')
+            if op == 'yep':
+                xq = self.fh.variables['xq'][:]
+                yq = self.fh.variables['yq'][:]
+                ix = np.where((xq > self.west_lon) & (xq < self.east_lon))[0]
+                iy = np.where((yq > self.south_lat) & (yq < self.north_lat))[0]
+                iy = np.append(iy, iy[-1] + 1)
+            else:
+                xh = self.fh.variables['xh'][:]
+                yh = self.fh.variables['yh'][:]
+                ix = np.where((xh > self.west_lon) & (xh < self.east_lon))[0]
+                iy = np.where((yh > self.south_lat) & (yh < self.north_lat))[0]
+                ix = np.insert(ix, 0, ix[0] - 1)
+            u = self.fh.variables['u'][:, :, iy, ix]
+            if np.ma.isMaskedArray(u):
+                u = u.filled(0)
+            if op == 'yep':
+                u = 0.5 * (u[:, :, :-1] + u[:, :, 1:])
+            else:
+                u = 0.5 * (u[:, :, :, :-1] + u[:, :, :, 1:])
+            self.assertTrue(np.allclose(u, gvvar.values))

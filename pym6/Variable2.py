@@ -3,6 +3,7 @@ from functools import partial, partialmethod
 from collections import OrderedDict
 from netCDF4 import Dataset as dset
 import xarray as xr
+from numba import jit
 
 
 def find_index_limits(dimension, start, end):
@@ -465,6 +466,25 @@ class GridVariable2(Domain):
             coords=self.return_dimensions(),
             dims=self._final_dimensions)
         return da
+
+    @staticmethod
+    @jit()
+    def getvaratz(array, z, e):
+        array_out = np.full(
+            (array.shape[0], z.size, array.shape[2], array.shape[3]), 0.0)
+        for l in range(array.shape[0]):
+            for k in range(array.shape[1]):
+                for j in range(array.shape[2]):
+                    for i in range(array.shape[3]):
+                        for m in range(z.size):
+                            if (e[l, k, j, i] - z[m]) * (
+                                    e[l, k + 1, j, i] - z[m]) <= 0:
+                                array_out[l, m, j, i] = array[l, k, j, i]
+        return array_out
+
+    def toz(self, z, e):
+        self.operations.append(lambda a: self.getvaratz(a, z, e))
+        return self
 
     @property
     def dimensions(self):
