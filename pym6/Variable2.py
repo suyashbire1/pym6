@@ -2,6 +2,7 @@ import numpy as np
 from functools import partial, partialmethod
 from collections import OrderedDict
 from netCDF4 import Dataset as dset
+import xarray as xr
 
 
 def find_index_limits(dimension, start, end):
@@ -211,10 +212,10 @@ class GridVariable2(Domain):
         Domain.__init__(self, **initializer)
         if final_loc:
             self._final_loc = final_loc
-            self.get_final_location_dimensions()
         else:
             self._final_loc = self._current_hloc + self._current_vloc
             self._final_dimensions = tuple(self._current_dimensions)
+        self.get_final_location_dimensions()
         self._bc_type = bc_type
         self.geometry = initializer.get('geometry', None)
         self.array = None
@@ -239,8 +240,12 @@ class GridVariable2(Domain):
         dims = self._final_dimensions
         return_dims = OrderedDict()
         for dim in dims:
-            start, stop, stride = self.indices[dim]
-            return_dims[dim] = self.dim_arrays[dim][start:stop:stride]
+            dim_array = self.dim_arrays[dim]
+            if isinstance(dim_array, np.ndarray):
+                start, stop, stride = self.indices[dim]
+                return_dims[dim] = dim_array[start:stop:stride]
+            else:
+                return_dims[dim] = dim_array
         return return_dims
 
     @staticmethod
@@ -282,23 +287,8 @@ class GridVariable2(Domain):
     zsm = partialmethod(modify_index_return_self, 1, 0, -1)
     zep = partialmethod(modify_index_return_self, 1, 1, 1)
 
-    def get_slice1(self):
-        self._slice = []
-        dims = self._final_dimensions
-        current_dims = self._current_dimensions
-        for i, dim in enumerate(dims):
-            indices = list(self.indices[dim])
-            if indices[0] < 0:
-                indices[0] = 0
-            current_dim = current_dims[i]
-            if indices[1] > self.dim_arrays[current_dim].size:
-                indices[1] = self.dim_arrays[current_dim].size
-            self._slice.append(slice(*indices))
-        self._slice = tuple(self._slice)
-        return self
-
     def get_slice(self):
-        #assert self._final_dimensions == tuple(self._current_dimensions)
+        # assert self._final_dimensions == tuple(self._current_dimensions)
         self._slice = []
         for axis in range(4):
             indices = self.get_slice_by_axis(axis)
@@ -362,12 +352,6 @@ class GridVariable2(Domain):
                     bc_type = self._bc_type[loc][2 * i + 1]
                     self.operations.append(
                         self.BoundaryCondition(bc_type, i + 1, -1))
-
-    LazyNumpyOperation = LazyNumpyOperation
-
-    def np_ops(self, npfunc, *args, **kwargs):
-        self.operations.append(
-            self.LazyNumpyOperation(npfunc, *args, **kwargs))
         return self
 
     @staticmethod
@@ -442,11 +426,45 @@ class GridVariable2(Domain):
             divisor = divisor[self._slice_2D]
         elif axis == 1:
             divisor = 9.8 / 1031 * np.diff(
-                self._dim_arrays[self._final_dimensions[1]][2:4])
+                self.dim_arrays[self._final_dimensions[1]][2:4])
             self.adjust_dimensions_and_indices_for_vertical_move()
         dadx = partial(lambda x, a: np.diff(a, n=1, axis=x) / divisor, axis)
         self.operations.append(dadx)
         return self
+
+    LazyNumpyOperation = LazyNumpyOperation
+
+    def np_ops(self, npfunc, *args, **kwargs):
+        self.operations.append(
+            self.LazyNumpyOperation(npfunc, *args, **kwargs))
+        return self
+
+    def nanmean(self, axis=[0, 1, 2, 3], keepdims=False):
+        try:
+            for ax in axis:
+                axis_string = self._current_dimensions[ax]
+                self.dim_arrays[axis_string] = np.mean(
+                    self.dim_arrays[axis_string])
+                self.indices.pop(axis_string)
+        except TypeError:
+            axis_string = self._current_dimensions[axis]
+            self.dim_arrays[axis_string] = np.mean(
+                self.dim_arrays[axis_string])
+
+        def meanfunc(array):
+            return np.nanmean(array, axis=axis, keepdims=keepdims)
+
+        self.operations.append(meanfunc)
+        return self
+
+    def to_DataArray(self):
+        if len(self.operations) is not 0:
+            self.compute()
+        da = xr.DataArray(
+            self.array,
+            coords=self.return_dimensions(),
+            dims=self._final_dimensions)
+        return da
 
     @property
     def dimensions(self):
@@ -476,6 +494,8 @@ class GridVariable2(Domain):
         for ops in self.operations:
             self.array = ops(self.array)
         self.operations = []
+        assert self._current_hloc == self._final_hloc
+        assert self._current_vloc == self._final_vloc
         return self
 
     @property

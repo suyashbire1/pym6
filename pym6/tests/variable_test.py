@@ -1,6 +1,7 @@
 from pym6 import Variable, Variable2, Domain
 from netCDF4 import Dataset as dset
 import numpy as np
+import xarray as xr
 import unittest
 gv = Variable.GridVariable
 gv3 = Variable2.GridVariable2
@@ -151,9 +152,56 @@ class test_variable(unittest.TestCase):
                     b = gvvar.indices[gvvar.final_dimensions[i + 1]]
                     self.assertEqual(a[j] + plusminus[j], b[j])
 
-    def test_diff(self):
+    def test_nanmean_tz(self):
         for var in self.vars:
-            gvvar = gv3(
-                var, self.fh, geometry=self.geom,
-                **self.initializer).get_slice().read().compute().array
-            self.assertIsInstance(gvvar, np.ndarray)
+            gvvar = (gv3(var, self.fh).get_slice().read()
+                     .nanmean(axis=(0, 1)).compute())
+            dims = gvvar.return_dimensions()
+            self.assertTrue(list(dims.items())[0][1].size == 1)
+            self.assertTrue(list(dims.items())[1][1].size == 1)
+            var_array = self.fh.variables[var][:]
+            if np.ma.isMaskedArray(var_array):
+                var_array.filled(0)
+            var_array = np.nanmean(var_array, axis=(0, 1), keepdims=False)
+            self.assertTrue(np.allclose(gvvar.array, var_array))
+            gvvar = (gv3(var, self.fh).get_slice().read()
+                     .nanmean(axis=1).compute())
+            dims = gvvar.return_dimensions()
+            self.assertTrue(list(dims.items())[1][1].size == 1)
+            var_array = self.fh.variables[var][:]
+            if np.ma.isMaskedArray(var_array):
+                var_array = var_array.filled(0)
+            var_array = np.nanmean(var_array, axis=1, keepdims=False)
+            self.assertTrue(
+                np.allclose(gvvar.array, var_array),
+                msg=f'{var, gvvar.array-var_array}')
+
+    def test_nanmean_xy(self):
+        for var in self.vars:
+            gvvar = (gv3(var, self.fh).get_slice().read()
+                     .nanmean(axis=(2, 3)).compute())
+            dims = gvvar.return_dimensions()
+            self.assertTrue(list(dims.items())[2][1].size == 1)
+            self.assertTrue(list(dims.items())[3][1].size == 1)
+            var_array = self.fh.variables[var][:]
+            if np.ma.isMaskedArray(var_array):
+                var_array = var_array.filled(0)
+            var_array = np.nanmean(var_array, axis=(2, 3), keepdims=False)
+            self.assertTrue(np.allclose(gvvar.array, var_array), )
+            gvvar = (gv3(var, self.fh).get_slice().read()
+                     .nanmean(axis=2).compute())
+            dims = gvvar.return_dimensions()
+            self.assertTrue(list(dims.items())[2][1].size == 1)
+            var_array = self.fh.variables[var][:]
+            if np.ma.isMaskedArray(var_array):
+                var_array = var_array.filled(0)
+            var_array = np.nanmean(var_array, axis=2, keepdims=False)
+            self.assertTrue(
+                np.allclose(gvvar.array, var_array),
+                msg=f'{var, gvvar.array-var_array}')
+
+    def test_xarray(self):
+        for var in self.vars:
+            gvvar = gv3(var, self.fh,
+                        **self.initializer).get_slice().read().to_DataArray()
+            self.assertIsInstance(gvvar, xr.DataArray)

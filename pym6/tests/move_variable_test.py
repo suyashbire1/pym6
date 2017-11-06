@@ -295,7 +295,7 @@ class test_move(unittest.TestCase):
             self.assertTrue(value.size == gvvar.shape[j])
         e = self.fh.variables['e'][:]
         e = 0.5 * (e[:, :-1] + e[:, 1:])
-        self.assertTrue(np.allclose(e[:, -1], gvvar[:, -1]))
+        self.assertTrue(np.allclose(e, gvvar))
 
     def test_move_vertical_u(self):
         gvvar = gv3(
@@ -490,3 +490,164 @@ class test_move(unittest.TestCase):
                 r = r.filled(0)
             dr = np.diff(r, axis=axis[i]) / divisor
             self.assertTrue(np.allclose(dr, gvvar))
+
+    def test_ddx_u(self):
+        ops = ['yep', 'xsm']
+        axis = [2, 3]
+        new_loc = ['q', 'h']
+        for i, op in enumerate(ops):
+            gvvar = getattr(
+                gv3('u',
+                    self.fh,
+                    final_loc=new_loc[i] + 'l',
+                    geometry=self.geometry), op)().get_slice().read()
+            self.assertTrue(gvvar.hloc == 'u')
+            gvvar = gvvar.dbyd(axis[i])
+            self.assertTrue(gvvar.hloc == new_loc[i])
+            dims = gvvar.return_dimensions()
+            gvvar = gvvar.compute().array
+            for j, (key, value) in enumerate(dims.items()):
+                self.assertTrue(
+                    value.size == gvvar.shape[j],
+                    msg=f'{value.size,gvvar.shape[j]}')
+            u = self.fh.variables['u'][:]
+            if np.ma.isMaskedArray(u):
+                u = u.filled(0)
+            if i == 0:
+                u = np.concatenate((u, -u[:, :, -1:, :]), axis=2)
+                divisor = self.fhgeo.variables['dyBu'][:]
+            elif i == 1:
+                u = np.concatenate((np.zeros(u[:, :, :, :1].shape), u), axis=3)
+                divisor = self.fhgeo.variables['dxT'][:]
+            du = np.diff(u, axis=axis[i]) / divisor
+            self.assertTrue(np.allclose(du, gvvar))
+
+    def test_ddx_v(self):
+        ops = ['ysm', 'xep']
+        new_loc = ['h', 'q']
+        axis = [2, 3]
+        for i, op in enumerate(ops):
+            gvvar = getattr(
+                gv3('v',
+                    self.fh,
+                    final_loc=new_loc[i] + 'l',
+                    geometry=self.geometry), op)().get_slice().read()
+            self.assertTrue(gvvar.hloc == 'v')
+            gvvar = gvvar.dbyd(axis[i])
+            self.assertTrue(gvvar.hloc == new_loc[i])
+            dims = gvvar.return_dimensions()
+            gvvar = gvvar.compute().array
+            for j, (key, value) in enumerate(dims.items()):
+                self.assertTrue(
+                    value.size == gvvar.shape[j],
+                    msg=f'{value.size,gvvar.shape[j]}')
+            v = self.fh.variables['v'][:]
+            if np.ma.isMaskedArray(v):
+                v = v.filled(0)
+            if i == 0:
+                v = np.concatenate((np.zeros(v[:, :, :1, :].shape), v), axis=2)
+                divisor = self.fhgeo.variables['dyT'][:]
+                dv = np.diff(v, axis=axis[i]) / divisor
+            elif i == 1:
+                v = np.concatenate((v, -v[:, :, :, -1:]), axis=3)
+                divisor = self.fhgeo.variables['dxBu'][:]
+            dv = np.diff(v, axis=axis[i]) / divisor
+            self.assertTrue(np.allclose(dv, gvvar), msg=f'{dv-gvvar}')
+
+    def test_ddx_h(self):
+        ops = ['xep', 'yep']
+        axis = [3, 2]
+        new_loc = ['u', 'v']
+        for i, op in enumerate(ops):
+            gvvar = getattr(
+                gv3('wparam',
+                    self.fh,
+                    final_loc=new_loc[i] + 'l',
+                    geometry=self.geometry), op)().get_slice().read()
+            self.assertTrue(gvvar.hloc == 'h')
+            gvvar = gvvar.dbyd(axis[i])
+            self.assertTrue(gvvar.hloc == new_loc[i])
+            dims = gvvar.return_dimensions()
+            gvvar = gvvar.compute().array
+            for j, (key, value) in enumerate(dims.items()):
+                self.assertTrue(
+                    value.size == gvvar.shape[j],
+                    msg=f'{value.size,gvvar.shape[j]}')
+            w = self.fh.variables['wparam'][:]
+            if np.ma.isMaskedArray(w):
+                w = w.filled(0)
+            if i == 0:
+                w = np.concatenate((w, w[:, :, :, -1:]), axis=3)
+                divisor = self.fhgeo.variables['dxCu'][:]
+            elif i == 1:
+                w = np.concatenate((w, w[:, :, -1:, :]), axis=2)
+                divisor = self.fhgeo.variables['dyCv'][:]
+            dw = np.diff(w, axis=axis[i]) / divisor
+            self.assertTrue(np.allclose(dw, gvvar))
+
+    def test_ddx_q(self):
+        ops = ['xsm', 'ysm']
+        axis = [3, 2]
+        new_loc = ['v', 'u']
+        for i, op in enumerate(ops):
+            gvvar = getattr(
+                gv3('RV',
+                    self.fh,
+                    final_loc=new_loc[i] + 'l',
+                    geometry=self.geometry), op)().get_slice().read()
+            self.assertTrue(gvvar.hloc == 'q')
+            gvvar = gvvar.dbyd(axis[i])
+            self.assertTrue(gvvar.hloc == new_loc[i])
+            dims = gvvar.return_dimensions()
+            gvvar = gvvar.compute().array
+            for j, (key, value) in enumerate(dims.items()):
+                self.assertTrue(
+                    value.size == gvvar.shape[j],
+                    msg=f'{value.size,gvvar.shape[j]}')
+            rv = self.fh.variables['RV'][:]
+            if np.ma.isMaskedArray(rv):
+                rv = rv.filled(0)
+            if i == 0:
+                rv = np.concatenate(
+                    (np.zeros(rv[:, :, :, :1].shape), rv), axis=3)
+                divisor = self.fhgeo.variables['dxCv'][:]
+            elif i == 1:
+                rv = np.concatenate(
+                    (np.zeros(rv[:, :, :1, :].shape), rv), axis=2)
+                divisor = self.fhgeo.variables['dyCu'][:]
+            dr = np.diff(rv, axis=axis[i]) / divisor
+            self.assertTrue(np.allclose(dr, gvvar))
+
+    def test_ddx_vertical_e(self):
+        gvvar = gv3('e', self.fh, final_loc='hl').zep().get_slice().read()
+        self.assertTrue(gvvar.vloc == 'i')
+        gvvar = gvvar.dbyd(1)
+        self.assertTrue(gvvar.vloc == 'l')
+        dims = gvvar.return_dimensions()
+        gvvar = gvvar.compute().array
+        for j, (key, value) in enumerate(dims.items()):
+            self.assertTrue(value.size == gvvar.shape[j])
+        e = self.fh.variables['e'][:]
+        zi = self.fh.variables['zi'][:]
+        db = 9.8 / 1031 * (zi[3] - zi[2])
+        de = np.diff(e, axis=1) / db
+        self.assertTrue(np.allclose(de, gvvar))
+
+    def test_ddx_vertical_u(self):
+        gvvar = gv3(
+            'u', self.fh, final_loc='ui').zsm().zep().get_slice().read()
+        self.assertTrue(gvvar.vloc == 'l')
+        gvvar = gvvar.dbyd(1)
+        self.assertTrue(gvvar.vloc == 'i')
+        dims = gvvar.return_dimensions()
+        gvvar = gvvar.compute().array
+        for j, (key, value) in enumerate(dims.items()):
+            self.assertTrue(value.size == gvvar.shape[j])
+        u = self.fh.variables['u'][:]
+        if np.ma.isMaskedArray(u):
+            u = u.filled(0)
+        u = np.concatenate((u[:, :1, :, :], u, -u[:, -1:, :, :]), axis=1)
+        zi = self.fh.variables['zi'][:]
+        db = 9.8 / 1031 * (zi[3] - zi[2])
+        du = np.diff(u, axis=1) / db
+        self.assertTrue(np.allclose(du, gvvar))
