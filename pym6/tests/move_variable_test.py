@@ -13,15 +13,20 @@ class test_move(unittest.TestCase):
         self.west_lon, self.east_lon = -10, -5
         self.fh = dset(
             '/home/sbire/pym6/pym6/tests/data/output__0001_12_009.nc')
+        self.fhgeo = dset('/home/sbire/pym6/pym6/tests/data/ocean_geometry.nc')
+        self.geometry = Variable2.GridGeometry(
+            '/home/sbire/pym6/pym6/tests/data/ocean_geometry.nc')
         self.initializer = dict(
             south_lat=self.south_lat,
             north_lat=self.north_lat,
             west_lon=self.west_lon,
-            east_lon=self.east_lon)
+            east_lon=self.east_lon,
+            geometry=self.geometry)
         self.vars = ['e', 'u', 'v', 'wparam', 'RV']
 
     def tearDown(self):
         self.fh.close()
+        self.fhgeo.close()
 
     def test_move_u(self):
         ops = ['yep', 'xsm']
@@ -329,3 +334,159 @@ class test_move(unittest.TestCase):
         u = np.concatenate((u, -u[:, :, -1:, :]), axis=2)
         u = 0.5 * (u[:, :, :-1] + u[:, :, 1:])
         self.assertTrue(np.allclose(u, gvvar))
+
+    def test_ddx_u_subset(self):
+        ops = ['yep', 'xsm']
+        axis = [2, 3]
+        new_loc = ['q', 'h']
+        for i, op in enumerate(ops):
+            gvvar = getattr(
+                gv3('u',
+                    self.fh,
+                    final_loc=new_loc[i] + 'l',
+                    **self.initializer), op)().get_slice().read()
+            self.assertTrue(gvvar.hloc == 'u')
+            gvvar = gvvar.dbyd(axis[i])
+            self.assertTrue(gvvar.hloc == new_loc[i])
+            dims = gvvar.return_dimensions()
+            gvvar = gvvar.compute().array
+            for j, (key, value) in enumerate(dims.items()):
+                self.assertTrue(
+                    value.size == gvvar.shape[j],
+                    msg=f'{value.size,gvvar.shape[j]}')
+            if op == 'yep':
+                xq = self.fh.variables['xq'][:]
+                yq = self.fh.variables['yq'][:]
+                ix = np.where((xq > self.west_lon) & (xq < self.east_lon))[0]
+                iy = np.where((yq > self.south_lat) & (yq < self.north_lat))[0]
+                divisor = self.fhgeo.variables['dyBu'][iy, ix]
+                iy = np.append(iy, iy[-1] + 1)
+            else:
+                xh = self.fh.variables['xh'][:]
+                yh = self.fh.variables['yh'][:]
+                ix = np.where((xh > self.west_lon) & (xh < self.east_lon))[0]
+                iy = np.where((yh > self.south_lat) & (yh < self.north_lat))[0]
+                divisor = self.fhgeo.variables['dxT'][iy, ix]
+                ix = np.insert(ix, 0, ix[0] - 1)
+            u = self.fh.variables['u'][:, :, iy, ix]
+            if np.ma.isMaskedArray(u):
+                u = u.filled(0)
+            du = np.diff(u, axis=axis[i]) / divisor
+            self.assertTrue(np.allclose(du, gvvar))
+
+    def test_ddx_v_subset(self):
+        ops = ['ysm', 'xep']
+        new_loc = ['h', 'q']
+        axis = [2, 3]
+        for i, op in enumerate(ops):
+            gvvar = getattr(
+                gv3('v',
+                    self.fh,
+                    final_loc=new_loc[i] + 'l',
+                    **self.initializer), op)().get_slice().read()
+            self.assertTrue(gvvar.hloc == 'v')
+            gvvar = gvvar.dbyd(axis[i])
+            self.assertTrue(gvvar.hloc == new_loc[i])
+            dims = gvvar.return_dimensions()
+            gvvar = gvvar.compute().array
+            for j, (key, value) in enumerate(dims.items()):
+                self.assertTrue(
+                    value.size == gvvar.shape[j],
+                    msg=f'{value.size,gvvar.shape[j]}')
+            if op == 'xep':
+                xq = self.fh.variables['xq'][:]
+                yq = self.fh.variables['yq'][:]
+                ix = np.where((xq > self.west_lon) & (xq < self.east_lon))[0]
+                iy = np.where((yq > self.south_lat) & (yq < self.north_lat))[0]
+                divisor = self.fhgeo.variables['dxBu'][iy, ix]
+                ix = np.append(ix, ix[-1] + 1)
+            else:
+                xh = self.fh.variables['xh'][:]
+                yh = self.fh.variables['yh'][:]
+                ix = np.where((xh > self.west_lon) & (xh < self.east_lon))[0]
+                iy = np.where((yh > self.south_lat) & (yh < self.north_lat))[0]
+                divisor = self.fhgeo.variables['dyT'][iy, ix]
+                iy = np.insert(iy, 0, iy[0] - 1)
+            v = self.fh.variables['v'][:, :, iy, ix]
+            if np.ma.isMaskedArray(v):
+                v = v.filled(0)
+            dv = np.diff(v, axis=axis[i]) / divisor
+            self.assertTrue(np.allclose(dv, gvvar), msg=f'{dv-gvvar}')
+
+    def test_ddx_h_subset(self):
+        ops = ['xep', 'yep']
+        axis = [3, 2]
+        new_loc = ['u', 'v']
+        for i, op in enumerate(ops):
+            gvvar = getattr(
+                gv3('wparam',
+                    self.fh,
+                    final_loc=new_loc[i] + 'l',
+                    **self.initializer), op)().get_slice().read()
+            self.assertTrue(gvvar.hloc == 'h')
+            gvvar = gvvar.dbyd(axis[i])
+            self.assertTrue(gvvar.hloc == new_loc[i])
+            dims = gvvar.return_dimensions()
+            gvvar = gvvar.compute().array
+            for j, (key, value) in enumerate(dims.items()):
+                self.assertTrue(
+                    value.size == gvvar.shape[j],
+                    msg=f'{value.size,gvvar.shape[j]}')
+            if op == 'xep':
+                xq = self.fh.variables['xq'][:]
+                yh = self.fh.variables['yh'][:]
+                ix = np.where((xq > self.west_lon) & (xq < self.east_lon))[0]
+                iy = np.where((yh > self.south_lat) & (yh < self.north_lat))[0]
+                divisor = self.fhgeo.variables['dxCu'][iy, ix]
+                ix = np.append(ix, ix[-1] + 1)
+            else:
+                xh = self.fh.variables['xh'][:]
+                yq = self.fh.variables['yq'][:]
+                ix = np.where((xh > self.west_lon) & (xh < self.east_lon))[0]
+                iy = np.where((yq > self.south_lat) & (yq < self.north_lat))[0]
+                divisor = self.fhgeo.variables['dyCv'][iy, ix]
+                iy = np.append(iy, iy[-1] + 1)
+            w = self.fh.variables['wparam'][:, :, iy, ix]
+            if np.ma.isMaskedArray(w):
+                w = w.filled(0)
+            dw = np.diff(w, axis=axis[i]) / divisor
+            self.assertTrue(np.allclose(dw, gvvar))
+
+    def test_ddx_q_subset(self):
+        ops = ['xsm', 'ysm']
+        axis = [3, 2]
+        new_loc = ['v', 'u']
+        for i, op in enumerate(ops):
+            gvvar = getattr(
+                gv3('RV',
+                    self.fh,
+                    final_loc=new_loc[i] + 'l',
+                    **self.initializer), op)().get_slice().read()
+            self.assertTrue(gvvar.hloc == 'q')
+            gvvar = gvvar.dbyd(axis[i])
+            self.assertTrue(gvvar.hloc == new_loc[i])
+            dims = gvvar.return_dimensions()
+            gvvar = gvvar.compute().array
+            for j, (key, value) in enumerate(dims.items()):
+                self.assertTrue(
+                    value.size == gvvar.shape[j],
+                    msg=f'{value.size,gvvar.shape[j]}')
+            if op == 'xsm':
+                xh = self.fh.variables['xh'][:]
+                yq = self.fh.variables['yq'][:]
+                ix = np.where((xh > self.west_lon) & (xh < self.east_lon))[0]
+                iy = np.where((yq > self.south_lat) & (yq < self.north_lat))[0]
+                divisor = self.fhgeo.variables['dxCv'][iy, ix]
+                ix = np.insert(ix, 0, ix[0] - 1)
+            else:
+                xq = self.fh.variables['xq'][:]
+                yh = self.fh.variables['yh'][:]
+                ix = np.where((xq > self.west_lon) & (xq < self.east_lon))[0]
+                iy = np.where((yh > self.south_lat) & (yh < self.north_lat))[0]
+                divisor = self.fhgeo.variables['dyCu'][iy, ix]
+                iy = np.insert(iy, 0, iy[0] - 1)
+            r = self.fh.variables['RV'][:, :, iy, ix]
+            if np.ma.isMaskedArray(r):
+                r = r.filled(0)
+            dr = np.diff(r, axis=axis[i]) / divisor
+            self.assertTrue(np.allclose(dr, gvvar))

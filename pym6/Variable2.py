@@ -306,6 +306,14 @@ class GridVariable2(Domain):
         self._slice = tuple(self._slice)
         return self
 
+    def get_slice_2D(self):
+        self._slice_2D = []
+        for axis in range(2, 4):
+            indices = self.get_slice_by_axis(axis)
+            self._slice_2D.append(slice(*indices))
+        self._slice_2D = tuple(self._slice_2D)
+        return self
+
     def get_slice_by_axis(self, axis):
         dims = self._final_dimensions
         dim = dims[axis]
@@ -367,17 +375,22 @@ class GridVariable2(Domain):
         return 0.5 * (array[:, :-1, :, :] + array[:, 1:, :, :])
 
     @staticmethod
-    def check_possible_movements_for_move(current_loc, new_loc):
+    def check_possible_movements_for_move(current_loc, new_loc=None,
+                                          axis=None):
         possible_from_to = dict(
             u=['q', 'h'], v=['h', 'q'], h=['v', 'u'], q=['u', 'v'])
         possible_ns = dict(u=[0, 1], v=[1, 0], h=[0, 0], q=[1, 1])
         possible_ne = dict(u=[-1, 0], v=[0, -1], h=[-1, -1], q=[0, 0])
 
-        axis = possible_from_to[current_loc].index(new_loc)
-        ns = possible_ns[current_loc][axis]
-        ne = possible_ne[current_loc][axis]
-        axis += 2
-        return (axis, ns, ne)
+        if new_loc is not None:
+            axis = possible_from_to[current_loc].index(new_loc)
+            axis += 2
+        ns = possible_ns[current_loc][axis - 2]
+        ne = possible_ne[current_loc][axis - 2]
+        if new_loc is not None:
+            return (axis, ns, ne)
+        else:
+            return (ns, ne)
 
     @staticmethod
     def horizontal_move(axis, array):
@@ -410,7 +423,7 @@ class GridVariable2(Domain):
             self.operations.append(self.vertical_move)
         elif new_loc in ['u', 'v', 'h', 'q'] and new_loc != self._current_hloc:
             axis, ns, ne = self.check_possible_movements_for_move(
-                self._current_hloc, new_loc)
+                self._current_hloc, new_loc=new_loc)
             self.adjust_dimensions_and_indices_for_horizontal_move(
                 axis, ns, ne)
             move = partial(self.horizontal_move, axis)
@@ -418,10 +431,22 @@ class GridVariable2(Domain):
         return self
 
     def dbyd(self, axis, weights=None):
-        divisor = self.geometry.get_divisor_for_diff(
-            self._current_hloc, axis, weights=weights)
-        dadx = partial(lambda x, a: np.diff(a, 1, axis=x) / divisor, axis)
+        if axis > 1:
+            ns, ne = self.check_possible_movements_for_move(
+                self._current_hloc, axis=axis)
+            self.adjust_dimensions_and_indices_for_horizontal_move(
+                axis, ns, ne)
+            divisor = self.geometry.get_divisor_for_diff(
+                self._current_hloc, axis, weights=weights)
+            self.get_slice_2D()
+            divisor = divisor[self._slice_2D]
+        elif axis == 1:
+            divisor = 9.8 / 1031 * np.diff(
+                self._dim_arrays[self._final_dimensions[1]][2:4])
+            self.adjust_dimensions_and_indices_for_vertical_move()
+        dadx = partial(lambda x, a: np.diff(a, n=1, axis=x) / divisor, axis)
         self.operations.append(dadx)
+        return self
 
     @property
     def dimensions(self):
