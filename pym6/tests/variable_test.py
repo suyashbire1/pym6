@@ -135,7 +135,7 @@ class test_variable(unittest.TestCase):
                         self.fh,
                         final_loc=hloc + vloc,
                         **self.initializer)
-                    dims = gvvar.final_dimensions
+                    dims = gvvar._final_dimensions
                     self.assertTrue(dims[0] == 'Time')
                     self.assertTrue(dims[1] == vdims[j])
                     self.assertTrue(dims[2] == ydims[i])
@@ -147,16 +147,16 @@ class test_variable(unittest.TestCase):
             for j, op in enumerate(['sm', 'ep']):
                 for var in self.vars:
                     gvvar = gv3(var, self.fh, **self.initializer)
-                    a = gvvar.indices[gvvar.final_dimensions[i + 1]]
+                    a = gvvar.indices[gvvar._final_dimensions[i + 1]]
                     gvvar = getattr(gvvar, dim + op)()
-                    b = gvvar.indices[gvvar.final_dimensions[i + 1]]
+                    b = gvvar.indices[gvvar._final_dimensions[i + 1]]
                     self.assertEqual(a[j] + plusminus[j], b[j])
 
     def test_nanmean_tz(self):
         for var in self.vars:
             gvvar = (gv3(var, self.fh).get_slice().read()
                      .nanmean(axis=(0, 1)).compute())
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             self.assertTrue(list(dims.items())[0][1].size == 1)
             self.assertTrue(list(dims.items())[1][1].size == 1)
             var_array = self.fh.variables[var][:]
@@ -166,7 +166,7 @@ class test_variable(unittest.TestCase):
             self.assertTrue(np.allclose(gvvar.array, var_array))
             gvvar = (gv3(var, self.fh).get_slice().read()
                      .nanmean(axis=1).compute())
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             self.assertTrue(list(dims.items())[1][1].size == 1)
             var_array = self.fh.variables[var][:]
             if np.ma.isMaskedArray(var_array):
@@ -180,7 +180,7 @@ class test_variable(unittest.TestCase):
         for var in self.vars:
             gvvar = (gv3(var, self.fh).get_slice().read()
                      .nanmean(axis=(2, 3)).compute())
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             self.assertTrue(list(dims.items())[2][1].size == 1)
             self.assertTrue(list(dims.items())[3][1].size == 1)
             var_array = self.fh.variables[var][:]
@@ -190,7 +190,7 @@ class test_variable(unittest.TestCase):
             self.assertTrue(np.allclose(gvvar.array, var_array), )
             gvvar = (gv3(var, self.fh).get_slice().read()
                      .nanmean(axis=2).compute())
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             self.assertTrue(list(dims.items())[2][1].size == 1)
             var_array = self.fh.variables[var][:]
             if np.ma.isMaskedArray(var_array):

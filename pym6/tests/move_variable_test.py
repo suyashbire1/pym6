@@ -37,7 +37,7 @@ class test_move(unittest.TestCase):
             self.assertTrue(gvvar.hloc == 'u')
             gvvar = gvvar.move_to(new_loc[i])
             self.assertTrue(gvvar.hloc == new_loc[i])
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             gvvar = gvvar.compute().array
             for j, (key, value) in enumerate(dims.items()):
                 self.assertTrue(value.size == gvvar.shape[j])
@@ -64,7 +64,7 @@ class test_move(unittest.TestCase):
             self.assertTrue(gvvar.hloc == 'u')
             gvvar = gvvar.move_to(new_loc[i])
             self.assertTrue(gvvar.hloc == new_loc[i])
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             gvvar = gvvar.compute().array
             for j, (key, value) in enumerate(dims.items()):
                 self.assertTrue(
@@ -100,7 +100,7 @@ class test_move(unittest.TestCase):
             self.assertTrue(gvvar.hloc == 'v')
             gvvar = gvvar.move_to(new_loc[i])
             self.assertTrue(gvvar.hloc == new_loc[i])
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             gvvar = gvvar.compute().array
             for j, (key, value) in enumerate(dims.items()):
                 self.assertTrue(value.size == gvvar.shape[j])
@@ -127,7 +127,7 @@ class test_move(unittest.TestCase):
             self.assertTrue(gvvar.hloc == 'v')
             gvvar = gvvar.move_to(new_loc[i])
             self.assertTrue(gvvar.hloc == new_loc[i])
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             gvvar = gvvar.compute().array
             for j, (key, value) in enumerate(dims.items()):
                 self.assertTrue(
@@ -164,7 +164,7 @@ class test_move(unittest.TestCase):
             self.assertTrue(gvvar.hloc == 'h')
             gvvar = gvvar.move_to(new_loc[i])
             self.assertTrue(gvvar.hloc == new_loc[i])
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             gvvar = gvvar.compute().array
             for j, (key, value) in enumerate(dims.items()):
                 self.assertTrue(value.size == gvvar.shape[j])
@@ -191,7 +191,7 @@ class test_move(unittest.TestCase):
             self.assertTrue(gvvar.hloc == 'h')
             gvvar = gvvar.move_to(new_loc[i])
             self.assertTrue(gvvar.hloc == new_loc[i])
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             gvvar = gvvar.compute().array
             for j, (key, value) in enumerate(dims.items()):
                 self.assertTrue(
@@ -228,7 +228,7 @@ class test_move(unittest.TestCase):
             self.assertTrue(gvvar.hloc == 'q')
             gvvar = gvvar.move_to(new_loc[i])
             self.assertTrue(gvvar.hloc == new_loc[i])
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             gvvar = gvvar.compute().array
             for j, (key, value) in enumerate(dims.items()):
                 self.assertTrue(value.size == gvvar.shape[j], msg=f'{value}')
@@ -257,7 +257,7 @@ class test_move(unittest.TestCase):
             self.assertTrue(gvvar.hloc == 'q')
             gvvar = gvvar.move_to(new_loc[i])
             self.assertTrue(gvvar.hloc == new_loc[i])
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             gvvar = gvvar.compute().array
             for j, (key, value) in enumerate(dims.items()):
                 self.assertTrue(
@@ -289,7 +289,7 @@ class test_move(unittest.TestCase):
         self.assertTrue(gvvar.vloc == 'i')
         gvvar = gvvar.move_to('l')
         self.assertTrue(gvvar.vloc == 'l')
-        dims = gvvar.return_dimensions()
+        dims = gvvar.dimensions
         gvvar = gvvar.compute().array
         for j, (key, value) in enumerate(dims.items()):
             self.assertTrue(value.size == gvvar.shape[j])
@@ -303,7 +303,7 @@ class test_move(unittest.TestCase):
         self.assertTrue(gvvar.vloc == 'l')
         gvvar = gvvar.move_to('i')
         self.assertTrue(gvvar.vloc == 'i')
-        dims = gvvar.return_dimensions()
+        dims = gvvar.dimensions
         gvvar = gvvar.compute().array
         for j, (key, value) in enumerate(dims.items()):
             self.assertTrue(value.size == gvvar.shape[j])
@@ -322,7 +322,7 @@ class test_move(unittest.TestCase):
         self.assertTrue(gvvar.hloc == 'h')
         gvvar = gvvar.move_to('v')
         self.assertTrue(gvvar.hloc == 'v')
-        dims = gvvar.return_dimensions()
+        dims = gvvar.dimensions
         gvvar = gvvar.compute().array
         for j, (key, value) in enumerate(dims.items()):
             self.assertTrue(value.size == gvvar.shape[j])
@@ -348,7 +348,7 @@ class test_move(unittest.TestCase):
             self.assertTrue(gvvar.hloc == 'u')
             gvvar = gvvar.dbyd(axis[i])
             self.assertTrue(gvvar.hloc == new_loc[i])
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             gvvar = gvvar.compute().array
             for j, (key, value) in enumerate(dims.items()):
                 self.assertTrue(
@@ -387,7 +387,7 @@ class test_move(unittest.TestCase):
             self.assertTrue(gvvar.hloc == 'v')
             gvvar = gvvar.dbyd(axis[i])
             self.assertTrue(gvvar.hloc == new_loc[i])
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             gvvar = gvvar.compute().array
             for j, (key, value) in enumerate(dims.items()):
                 self.assertTrue(
@@ -426,7 +426,7 @@ class test_move(unittest.TestCase):
             self.assertTrue(gvvar.hloc == 'h')
             gvvar = gvvar.dbyd(axis[i])
             self.assertTrue(gvvar.hloc == new_loc[i])
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             gvvar = gvvar.compute().array
             for j, (key, value) in enumerate(dims.items()):
                 self.assertTrue(
@@ -465,7 +465,7 @@ class test_move(unittest.TestCase):
             self.assertTrue(gvvar.hloc == 'q')
             gvvar = gvvar.dbyd(axis[i])
             self.assertTrue(gvvar.hloc == new_loc[i])
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             gvvar = gvvar.compute().array
             for j, (key, value) in enumerate(dims.items()):
                 self.assertTrue(
@@ -504,7 +504,7 @@ class test_move(unittest.TestCase):
             self.assertTrue(gvvar.hloc == 'u')
             gvvar = gvvar.dbyd(axis[i])
             self.assertTrue(gvvar.hloc == new_loc[i])
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             gvvar = gvvar.compute().array
             for j, (key, value) in enumerate(dims.items()):
                 self.assertTrue(
@@ -535,7 +535,7 @@ class test_move(unittest.TestCase):
             self.assertTrue(gvvar.hloc == 'v')
             gvvar = gvvar.dbyd(axis[i])
             self.assertTrue(gvvar.hloc == new_loc[i])
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             gvvar = gvvar.compute().array
             for j, (key, value) in enumerate(dims.items()):
                 self.assertTrue(
@@ -567,7 +567,7 @@ class test_move(unittest.TestCase):
             self.assertTrue(gvvar.hloc == 'h')
             gvvar = gvvar.dbyd(axis[i])
             self.assertTrue(gvvar.hloc == new_loc[i])
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             gvvar = gvvar.compute().array
             for j, (key, value) in enumerate(dims.items()):
                 self.assertTrue(
@@ -598,7 +598,7 @@ class test_move(unittest.TestCase):
             self.assertTrue(gvvar.hloc == 'q')
             gvvar = gvvar.dbyd(axis[i])
             self.assertTrue(gvvar.hloc == new_loc[i])
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             gvvar = gvvar.compute().array
             for j, (key, value) in enumerate(dims.items()):
                 self.assertTrue(
@@ -623,7 +623,7 @@ class test_move(unittest.TestCase):
         self.assertTrue(gvvar.vloc == 'i')
         gvvar = gvvar.dbyd(1)
         self.assertTrue(gvvar.vloc == 'l')
-        dims = gvvar.return_dimensions()
+        dims = gvvar.dimensions
         gvvar = gvvar.compute().array
         for j, (key, value) in enumerate(dims.items()):
             self.assertTrue(value.size == gvvar.shape[j])
@@ -639,7 +639,7 @@ class test_move(unittest.TestCase):
         self.assertTrue(gvvar.vloc == 'l')
         gvvar = gvvar.dbyd(1)
         self.assertTrue(gvvar.vloc == 'i')
-        dims = gvvar.return_dimensions()
+        dims = gvvar.dimensions
         gvvar = gvvar.compute().array
         for j, (key, value) in enumerate(dims.items()):
             self.assertTrue(value.size == gvvar.shape[j])
@@ -662,7 +662,7 @@ class test_move(unittest.TestCase):
                     final_loc=new_loc[i] + 'l',
                     **self.initializer), op)().get_slice().read().move_to(
                         new_loc[i])
-            dims = gvvar.return_dimensions()
+            dims = gvvar.dimensions
             gvvar = gvvar.to_DataArray()
             for j, (key, value) in enumerate(dims.items()):
                 self.assertTrue(

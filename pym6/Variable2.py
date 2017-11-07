@@ -221,6 +221,9 @@ class GridVariable2(Domain):
         self.geometry = initializer.get('geometry', None)
         self.array = None
         self.operations = []
+        self._name = initializer.get('name', var)
+        self._units = initializer.get('units', None)
+        self._math = initializer.get('math', None)
 
     def determine_location(self):
         dims = self._current_dimensions
@@ -458,20 +461,12 @@ class GridVariable2(Domain):
         self.operations.append(meanfunc)
         return self
 
-    def to_DataArray(self):
-        if len(self.operations) is not 0:
-            self.compute()
-        da = xr.DataArray(
-            self.array,
-            coords=self.return_dimensions(),
-            dims=self._final_dimensions)
-        return da
-
     @staticmethod
     @jit
-    def get_var_at_z(array, z, e):
+    def get_var_at_z(array, z, e, fillvalue=0.0):
         array_out = np.full(
-            (array.shape[0], z.size, array.shape[2], array.shape[3]), 0.0)
+            (array.shape[0], z.size, array.shape[2], array.shape[3]),
+            fillvalue)
         for l in range(array.shape[0]):
             for k in range(array.shape[1]):
                 for j in range(array.shape[2]):
@@ -485,32 +480,13 @@ class GridVariable2(Domain):
     def toz(self, z, e):
         assert self._current_hloc == e._current_hloc
         assert e._current_vloc == 'i'
-        self.operations.append(lambda a: self.get_var_at_z(a, z, e.array))
+
+        def lazy_toz(array):
+            return self.get_var_at_z(
+                array, z, e.array, fillvalue=self.fillvalue)
+
+        self.operations.append(lazy_toz)
         return self
-
-    @property
-    def dimensions(self):
-        return tuple(self._current_dimensions)
-
-    @property
-    def final_dimensions(self):
-        return self._final_dimensions
-
-    @property
-    def hloc(self):
-        """Horizontal location of the variable on the grid.
-        h : tracer,
-        q : vorticity,
-        u : zonal velocity,
-        v : meridional velocity."""
-        return self._current_hloc
-
-    @property
-    def vloc(self):
-        """Vertical location of the variable on the grid.
-        l : layer,
-        i : interface."""
-        return self._current_vloc
 
     def compute(self):
         for ops in self.operations:
@@ -519,6 +495,32 @@ class GridVariable2(Domain):
         assert self._current_hloc == self._final_hloc
         assert self._current_vloc == self._final_vloc
         return self
+
+    def to_DataArray(self):
+        if len(self.operations) is not 0:
+            self.compute()
+        da = xr.DataArray(
+            self.array,
+            coords=self.return_dimensions(),
+            dims=self._final_dimensions)
+        da.name = self._name
+        if self._math:
+            da.attrs['math'] = self._math
+        if self._units:
+            da.attrs['units'] = self._units
+        return da
+
+    @property
+    def dimensions(self):
+        return self.return_dimensions()
+
+    @property
+    def hloc(self):
+        return self._current_hloc
+
+    @property
+    def vloc(self):
+        return self._current_vloc
 
     @property
     def shape(self):
