@@ -468,8 +468,8 @@ class GridVariable2(Domain):
         return da
 
     @staticmethod
-    @jit()
-    def getvaratz(array, z, e):
+    @jit
+    def get_var_at_z(array, z, e):
         array_out = np.full(
             (array.shape[0], z.size, array.shape[2], array.shape[3]), 0.0)
         for l in range(array.shape[0]):
@@ -483,7 +483,9 @@ class GridVariable2(Domain):
         return array_out
 
     def toz(self, z, e):
-        self.operations.append(lambda a: self.getvaratz(a, z, e))
+        assert self._current_hloc == e._current_hloc
+        assert e._current_vloc == 'i'
+        self.operations.append(lambda a: self.get_var_at_z(a, z, e.array))
         return self
 
     @property

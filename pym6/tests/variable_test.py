@@ -205,3 +205,19 @@ class test_variable(unittest.TestCase):
             gvvar = gv3(var, self.fh,
                         **self.initializer).get_slice().read().to_DataArray()
             self.assertIsInstance(gvvar, xr.DataArray)
+
+    def test_get_var_at_z(self):
+        array = np.full((1, 3, 5, 5), 1)
+        array[:, 0, :, :] = 2
+        array[:, 2, :, :] = 0
+        e = np.full((1, 4, 5, 5), -2500)
+        e[:, 0] = 0
+        e[:, 1] = -1000
+        e[:, 2] = -2000
+        z = np.array([-2500, -1250, -750, -1])
+        array_at_z = gv3.get_var_at_z(array, z, e)
+        self.assertTrue(np.all(array_at_z[:, 0] == 0))
+        self.assertTrue(np.all(array_at_z[:, 1] == 1))
+        self.assertTrue(np.all(array_at_z[:, 2] == 2))
+        self.assertTrue(np.all(array_at_z[:, 3] == 2))
+        pass
